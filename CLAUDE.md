@@ -18,7 +18,13 @@ Este repo es la **tercera encarnación** del producto. Referencias (no se portan
 
 1. **`coach.html` + `README-CoachLab.md`** — prototipo funcional en un solo HTML (vanilla JS + SheetJS). Es la **especificación funcional validada**: si hay duda sobre cómo debe comportarse una feature, la respuesta está ahí. Funciones portables casi verbatim: `parseGrid`/`parseText` (import Excel/texto), `normName` (matching tolerante a acentos), lógica de `weightLabel` y `lastPerf`.
 2. **`NEXTJS_APP_CONTEXT.md`** — análisis del intento anterior (backend .NET 9 + Angular 21, repo WorkoutPlannerApp). De ahí se reutiliza **diseño, no código**: el algoritmo del WorkoutProcessor, el modelo Evaluation, el catálogo de ~48 ejercicios del seeder, y los patrones de UX (form dinámico por LoadType, typeahead de ejercicios).
-3. **Este repo** — la app definitiva: **Next.js full-stack** (frontend + backend en uno).
+3. **Este repo** — la app definitiva: **serverless en AWS, Nuxt + Hono + DynamoDB**.
+
+> ⚠ **Los tres archivos de referencia todavía no están en el repo.** Mientras falten, `spec-navigator` no tiene qué leer, y todo lo que dependa del formato exacto del prototipo (import Excel/texto, catálogo de ejercicios) va marcado como pendiente de validación en vez de inventado.
+
+### Historial de stack
+
+El proyecto tuvo una definición de stack anterior que **quedó descartada**: Next.js App Router + Server Actions + Prisma + PostgreSQL/Neon + Auth.js + shadcn/ui + Vercel. Si encontrás código, docs o comentarios que mencionen cualquiera de esas piezas, están desactualizados y hay que corregirlos. El stack vigente es el de §2.
 
 ---
 
@@ -26,42 +32,74 @@ Este repo es la **tercera encarnación** del producto. Referencias (no se portan
 
 | Tema | Decisión | Por qué |
 |---|---|---|
-| Stack | Next.js 14+ App Router, TypeScript estricto | Un solo stack, un solo deploy |
-| Backend | Server Actions + Server Components (Route Handlers solo para HTTP puro, ej. webhooks) | Seguro por diseño, menos plumbing |
-| DB | **PostgreSQL en Neon** | Free tier, cero mantenimiento, cercano a Vercel |
-| ORM | **Prisma** | Schema declarativo, migraciones, ecosistema Next |
-| Auth | **Auth.js (NextAuth) Credentials** + cookie httpOnly + hash con **argon2** | Nada de localStorage ni JWT casero |
-| Identidad | Email + contraseña. El código de invitación del coach es solo para vincular jugadores, **no** es la identidad | Reemplaza el código de 4 chars del prototipo |
-| Validación | **Zod** en todos los bordes (server actions, forms, imports) | Una sola fuente de schemas |
-| Forms | react-hook-form + zodResolver | Form dinámico de programas lo exige |
-| UI | Tailwind v4 + shadcn/ui + lucide-react | Continuidad visual con lo anterior |
-| Excel | SheetJS **cliente-side** | Igual que el prototipo; parsers son funciones puras |
-| Data fetching | Server Components + Prisma directo; TanStack Query solo si hace falta refetch/optimistic | No agregar capas por costumbre |
+| Infra | **AWS serverless**: CloudFront → Lambda (Nuxt SSR) + Lambda (API) → DynamoDB | Costo casi nulo en reposo, escala sola |
+| IaC | **SST v3**, definida en TypeScript | Un solo lenguaje de la infra al frontend |
+| Frontend | **Nuxt 4 en modo SSR** sobre Lambda + **Vue 3** + **Nuxt UI** | SSR permite leer la cookie de sesión en el server y renderizar según rol |
+| Backend | **Hono** sobre runtime Node.js en Lambda | Router mínimo y tipado, cold start bajo |
+| DB | **DynamoDB, single-table design** | Serverless de verdad: sin conexiones, sin pooler, sin mantenimiento |
+| Acceso a datos | **ElectroDB** | Modela entidades e índices sobre la tabla única sin escribir claves a mano |
+| Contrato API | Zod → **`@hono/zod-openapi`** → spec OpenAPI → **hey-api** genera el cliente TS que consume Nuxt | Una sola definición: el schema Zod es la validación *y* el contrato |
+| Auth | **JWT propio emitido por la API**, cookie httpOnly + Secure + SameSite=Lax; hash con **`@node-rs/argon2`** | Sin infra nueva; el User es un item más de la tabla. Nada de localStorage |
+| Identidad | Email + contraseña. El código de invitación del coach sirve solo para vincular jugadores, **no** es la identidad | Reemplaza el código de 4 chars del prototipo |
+| Validación | **Zod** en todos los bordes (rutas de la API, forms, imports) | Una sola fuente de schemas |
+| Forms | `UForm` de Nuxt UI con resolver de Zod | Reusa los mismos schemas que la API |
+| Excel | SheetJS **client-side** | Igual que el prototipo; los parsers son funciones puras |
+| Monorepo | pnpm workspaces: `packages/core`, `packages/api`, `packages/web`, `infra/` | El dominio se comparte entre API y frontend |
 | Package manager | **pnpm** | Estándar de facto |
-| Escala objetivo | ~300 usuarios máximo | No optimizar prematuramente; sí diseñar bien el modelo |
-| Posiciones | **Las 8 de rugby, fijas** (opción A) | Validado en prototipo; granularidad fina (pilar/hooker) se agrega después si un coach lo pide |
-| Grupos system | Forwards/Backs **globales** (`coachId=null, isSystem=true`), seedeados una vez | Menos duplicación |
-| Deploy | Vercel + Neon. Seed apagado en producción | |
+| Escala objetivo | ~300 usuarios máximo | No optimizar prematuramente; sí diseñar bien los access patterns |
+| Posiciones | **Las 8 de rugby, fijas, como constantes en código** (no van a la DB) | Son inmutables: leerlas de DynamoDB sería costo puro |
+| Grupos system | Forwards/Backs también **constantes en código** | Misma razón. Los grupos custom sí viven en la tabla |
+| Deploy | Stages de SST: uno personal por dev, más `production`. Seed apagado en producción | |
 
-**Fuera del MVP (deliberado, no olvidado):** push notifications, PWA, multi-deporte configurable, Realtime, compare de evaluaciones, impersonate de admin.
+**Fuera del MVP (deliberado, no olvidado):** push notifications, PWA, multi-deporte configurable, tiempo real/WebSockets, compare de evaluaciones, impersonate de admin.
 
 ---
 
 ## 3. Modelo de dominio
 
-### Entidades
+### Constantes en código (no van a DynamoDB)
 
-- **User** (`id, email único, passwordHash, role, name`) — roles: `PLAYER | COACH | ADMIN`.
-- **CoachProfile** (`userId, inviteCode?`) — el invite code vincula jugadores al registrarse.
-- **PlayerProfile** (`userId, coachId, positionId?, height?, weight?`).
-- **Position** — las 8 fijas: Primera Línea, Segunda Línea, Tercera Línea, Medio Scrum (FORWARD); Apertura, Centro, Wing, Fullback (BACK). Seedeadas, ids estables tipo slug (`"primera-linea"`).
-- **PositionGroup** (`coachId?, name, isSystem`) — Forwards y Backs son system/globales; los custom pertenecen a un coach y combinan cualquiera de las 8 posiciones vía **PositionOnGroup** (tabla puente).
-- **Exercise** — catálogo global (~48 seedeados del WorkoutPlanner). Tiene **`normalizedName`** (lowercase, sin acentos, indexado) para el matching de 1RM y "última vez".
-- **OneRM** (`playerId, exerciseId, kg, updatedAt`) — el 1RM vigente que carga el jugador o el coach.
-- **Evaluation** (`playerId, exerciseId, date, reps, weight`) — historial de tests de fuerza.
-- **Program** (`coachId, name, currentWeekId?`) → **Week** (`name, order`) → **Day** (`name, order`) → **Block** (`type: SINGLE|CIRCUIT, rounds, order`) → **BlockExercise** (`exerciseId, sets, reps, loadType: WEIGHT|PERCENTAGE|NONE, weight?, percentage?, targetRpe?, note, order`).
-- **ProgramAssignment** (`programId` + exactamente UNO de `playerId | positionId | positionGroupId`, más `priority`).
-- **SessionLog** (`playerId, dayId, completedAt?, dayNote`) → **ExerciseEntry** (`blockExerciseId, weight, reps, rpe, done`).
+Viven en `packages/core/src/domain/positions.ts`:
+
+- **Position** — las 8 fijas, con id slug estable: `primera-linea`, `segunda-linea`, `tercera-linea`, `medio-scrum` (FORWARD); `apertura`, `centro`, `wing`, `fullback` (BACK).
+- **System groups** — `forwards` (las 4 FORWARD) y `backs` (las 4 BACK).
+
+### Tabla única
+
+Una sola tabla DynamoDB (`CoachLab`) con `pk` / `sk` y **dos GSI**:
+
+- **GSI1 — "listar por padre"**: jugadores de un coach, programas de un coach, grupos custom de un coach, catálogo de ejercicios.
+- **GSI2 — "assignments por destino"**: los assignments que apuntan a un jugador, a un puesto o a un grupo. Es lo que alimenta `resolveProgram`.
+
+| Entidad | pk | sk | GSI | Notas |
+|---|---|---|---|---|
+| **User** | `userId` | — | GSI1: `coachId` / `userId` | Un solo item por persona: `email, passwordHash, name, role`; si COACH además `inviteCode`; si PLAYER además `coachId, positionId, heightCm, weightKg` |
+| **UniqueEmail** | `email` | — | — | Apunta a `userId`. Existe para garantizar unicidad con `TransactWrite` + `attribute_not_exists`, y para el lookup de login sin pasar por un GSI |
+| **UniqueInviteCode** | `inviteCode` | — | — | Apunta a `coachId`. Misma técnica |
+| **Exercise** | `exerciseId` | — | GSI1: `'catalog'` / `normalizedName` | Catálogo global. `normalizedName` es la clave del matching de 1RM |
+| **OneRM** | `playerId` | `exerciseId` | — | El 1RM vigente. Un query por `playerId` trae todos |
+| **Evaluation** | `playerId` | `exerciseId#date` | — | Historial de tests. Sin UI en el MVP |
+| **Program** | `programId` | `'meta'` | GSI1: `coachId` / `programId` | Metadata: `name, coachId, currentWeekId` |
+| **Week** | `programId` | `weekId` | — | **Contiene el árbol embebido**: días → bloques → ejercicios |
+| **PositionGroup** | `groupId` | — | GSI1: `coachId` / `groupId` | Solo grupos custom |
+| **ProgramAssignment** | `programId` | `assignmentId` | GSI2: `targetKey` / `assignmentId` | `targetKey` es `PLAYER#<id>`, `POSITION#<slug>` o `GROUP#<id>` |
+| **SessionLog** | `playerId` | `dayId` | — | **Contiene las entries embebidas**, como map indexado por `blockExerciseId` |
+
+### Las dos decisiones de embebido
+
+Son lo que hace que este diseño funcione. Entenderlas antes de tocar el modelo:
+
+1. **El árbol del programa se corta en la semana.** Un item `Week` contiene sus días, bloques y ejercicios. Motivo: *el jugador siempre lee exactamente una semana* → un solo `GetItem`. Una semana de 4 días × 4 bloques × 6 ejercicios pesa ~20 KB, muy por debajo del límite de 400 KB por item. Cortar más arriba (el programa entero en un item) reventaría el límite en un mesociclo largo; cortar más abajo obligaría a un query por día.
+
+2. **Las entries del jugador viven dentro del `SessionLog`.** Se leen y se escriben siempre juntas.
+
+Los niveles embebidos se guardan como **maps indexados por id, no como arrays**, con un campo `order` adentro:
+
+```ts
+days: { [dayId]: { name, order, blocks: { [blockId]: { type, rounds, order, exercises: { [beId]: {…} } } } } }
+```
+
+Así el autosave del editor actualiza una ruta estable (`SET days.#d.blocks.#b.exercises.#e.percentage = :v`) sin que se corran los índices al agregar o borrar hermanos. **El orden nunca sale del orden de las claves del map: siempre se ordena por el campo `order` en código.**
 
 ### Reglas de negocio críticas
 
@@ -72,62 +110,111 @@ Este repo es la **tercera encarnación** del producto. Referencias (no se portan
 3. Assignment a POSITION_GROUP system (Forwards/Backs) → 30
 4. Assignment a POSITION → 10
 
-Gana la mayor (base + `priority` override). Empate: `createdAt` más reciente. Esta lógica vive en **un solo lugar** (`lib/domain/resolveProgram.ts` o equivalente) y tiene tests.
+Gana la mayor (base + `priority` override). Empate: `createdAt` más reciente. Esta lógica vive en **un solo lugar** (`packages/core/src/domain/resolveProgram.ts`) y tiene tests.
+
+La query que la alimenta consulta GSI2 con hasta 4 `targetKey`: el del jugador, el de su puesto, el del grupo system que le corresponde y el de cada grupo custom que contiene su puesto.
 
 **Cálculo de carga** (el WorkoutProcessor, portado de .NET): si `loadType=PERCENTAGE`, buscar el OneRM del jugador para ese ejercicio (match por `normalizedName`, tolerante a inclusión parcial como en `rmFor` del prototipo) y calcular `round(percentage/100 * kg * 2) / 2` (redondeo a 0.5 kg como el prototipo). Sin 1RM → mostrar el % con aviso "falta tu 1RM de X". `WEIGHT` → kg fijo. `NONE` → sin carga.
 
-**"Última vez" (`lastPerf`)**: último `ExerciseEntry` del jugador para el mismo ejercicio (por `normalizedName`) en días anteriores, mostrando "Semana X · Día: NN kg · N reps · RPE N".
+**"Última vez" (`lastPerf`)**: último `ExerciseEntry` del jugador para el mismo ejercicio (por `normalizedName`) en días anteriores, mostrando "Semana X · Día: NN kg · N reps · RPE N". Se resuelve leyendo los `SessionLog` del jugador (query por `pk = playerId`) y filtrando en memoria: son decenas de items, no miles.
 
 **Coherencia LoadType**: `WEIGHT` exige `weight`, `PERCENTAGE` exige `percentage` (1–100), `NONE` no lleva ninguno. Validado en Zod, no solo en la UI.
+
+**Assignment con un solo destino**: exactamente uno de `playerId | positionId | positionGroupId`. En DynamoDB no hay CHECK constraints; lo garantizan Zod en el borde de la API **y** el hecho de que `targetKey` se deriva de un único destino.
 
 ---
 
 ## 4. RBAC — seguridad en 4 capas (TODAS obligatorias)
 
-1. **`middleware.ts`** — guard grueso por prefijo de ruta (`/coach/*`, `/player/*`, `/admin/*`). No es suficiente por sí solo.
-2. **`requireRole([...])`** — primera línea de **toda** server action. Sin excepciones: una action sin guard es un endpoint público.
-3. **Scoping en queries** — toda query de datos de negocio pasa por helpers de scope (ej. `scopedPlayers(session)`): COACH solo ve `coachId = session.userId`, PLAYER solo lo suyo, ADMIN todo. Recurso ajeno → **404, nunca 403** (no revelar existencia).
-4. **Server Components** — renderizan según permisos (`can(session, acción, recurso)`); la UI nunca muestra acciones que la capa 2/3 va a rechazar.
+1. **Agrupación de rutas en Hono** — `/coach/*`, `/player/*` y `/admin/*` son sub-apps con el middleware de rol montado en el grupo. No alcanza por sí solo, pero garantiza que ninguna ruta nueva nazca sin guard.
+2. **`requireRole([...])`** — middleware de Hono, primera línea de **toda** ruta que toque datos. Sin excepciones: una ruta sin guard es un endpoint público.
+3. **Scoping en el acceso a datos** — toda lectura o escritura de negocio pasa por helpers de scope (`scopedPlayer`, `scopedProgram`, …) que resuelven ownership contra el actor. Recurso ajeno → **404, nunca 403** (no revelar existencia).
+4. **Nuxt** — el middleware de ruta del frontend redirige por rol y los componentes no muestran acciones que la capa 2/3 va a rechazar. **Esto es UX, no seguridad**: la API igual tiene que rechazar.
 
-Matriz resumida: PLAYER ve/edita su perfil, su programa resuelto y sus logs. COACH gestiona su plantel, sus programas, assignments y grupos custom. ADMIN todo + posiciones/grupos system + CRUD del catálogo de ejercicios. **ADMIN no se autoregistra**: solo por seed o CLI.
+Matriz resumida: PLAYER ve/edita su perfil, su programa resuelto y sus logs. COACH gestiona su plantel, sus programas, assignments y grupos custom. ADMIN todo + CRUD del catálogo de ejercicios. **ADMIN no se autoregistra**: solo por seed o CLI.
+
+**El JWT** se firma con un secreto guardado en SST Secret, lleva `sub` (userId) y `role`, dura 30 días y viaja en cookie httpOnly / Secure / SameSite=Lax. El rol del token sirve para el guard grueso; **cualquier decisión sobre un dato concreto revalida contra la tabla**, porque el rol pudo cambiar después de emitido el token.
 
 ---
 
 ## 5. Prácticas de desarrollo
 
-### Estructura (App Router)
+### Estructura del monorepo
 
 ```
-app/
-  (public)/login, register
-  (app)/coach/...      # panel coach (plantel, posiciones, grupos, programas)
-  (app)/player/...     # mi semana, mi perfil, registro
-  (app)/admin/...
-lib/
-  domain/              # lógica pura: resolveProgram, calcLoad, lastPerf, normName, parsers
-  db.ts                # singleton Prisma
-  auth.ts              # config Auth.js + helpers requireRole/can/scoped*
-  validators/          # schemas Zod por entidad
-prisma/
-  schema.prisma, seed.ts, migrations/
-components/            # UI compartida (shadcn en components/ui)
+sst.config.ts
+infra/
+  storage.ts           # tabla DynamoDB + índices
+  api.ts               # Lambda de la API + ruta en el Router
+  web.ts               # Nuxt SSR en Lambda
+  secrets.ts           # JWT secret, etc.
+packages/
+  core/                # compartido entre API y web. Sin dependencias de AWS ni de Vue
+    src/
+      domain/          # lógica PURA: resolveProgram, calcLoad, rmFor, lastPerf,
+                       # buildPlayerDay, rpeDelta, normName, parseGrid, parseText, positions
+      entities/        # ElectroDB: entidades + Service. Único lugar que conoce las claves
+      access/          # scope y permisos: requireRole, can, scopedPlayer, scopedProgram
+      validators/      # schemas Zod por entidad — también son el contrato OpenAPI
+  api/
+    src/
+      index.ts         # app Hono + handler de Lambda
+      routes/          # un archivo por recurso (auth, players, programs, session…)
+      middleware/      # auth, requireRole, manejo de errores
+  web/                 # Nuxt 4 — el router SALE de los directorios, no se declara
+    app/
+      pages/
+        login.vue
+        register.vue
+        coach/
+          players/index.vue           # /coach/players
+          players/[playerId].vue      # /coach/players/:playerId
+          groups.vue
+          programs/index.vue
+          programs/[programId].vue    # padre: encabezado + tabs + <NuxtPage />
+          programs/[programId]/index.vue    # editor
+          programs/[programId]/assign.vue
+          programs/[programId]/import.vue
+          feedback/index.vue
+          feedback/[playerId].vue
+        player/week.vue, player/profile.vue
+        admin/index.vue
+      components/
+      composables/
+      layouts/         # auth (login/registro) y default (shell con sidebar)
+      middleware/      # guards de ruta por rol
+      plugins/         # api.ts — reenvía la cookie al cliente generado en SSR
+    nuxt.config.ts
+    generated/         # cliente TS de hey-api — NO se edita a mano.
+                       # Vive fuera de app/ para que no entre al auto-import;
+                       # se importa explícito con el alias `~~/generated`.
 ```
+
+**Regla de nombres de página** (Nuxt la aplica en silencio y muerde): si existe `x.vue` **y** el
+directorio `x/`, entonces `x.vue` pasa a ser el componente *padre* de esas rutas y sus hijos no se
+renderizan hasta que el padre incluya `<NuxtPage />`.
+
+- Vistas que **no** comparten estado ni encabezado (listado y detalle de plantel) → hermanas:
+  `players/index.vue` + `players/[playerId].vue`.
+- Vistas que **sí** lo comparten (editor, asignaciones e import de un programa cargan el mismo
+  programa y muestran los mismos tabs) → anidadas a propósito: `[programId].vue` como padre.
 
 ### Reglas de código
 
-- **Lógica de dominio = funciones puras en `lib/domain/`**, sin Prisma ni React adentro. Son lo que se testea primero (resolveProgram, calcLoad, lastPerf, parseGrid, parseText, normName).
-- **Zod es la única validación.** El schema Zod deriva el tipo (`z.infer`); no duplicar interfaces a mano. Server actions validan input con Zod ANTES de tocar la DB.
-- **Nunca confiar en el cliente**: ids, roles y ownership se verifican server-side siempre.
-- **Migraciones siempre** (`pnpm prisma migrate dev --name descripcion`), nunca `db push` fuera de experimentos locales descartables.
-- **Textos de UI en español** (es-UY como el prototipo). Código, commits e identificadores en inglés.
+- **Lógica de dominio = funciones puras en `packages/core/src/domain/`**, sin ElectroDB, sin Hono, sin Vue, sin `process.env`. Son lo que se testea primero (resolveProgram, calcLoad, rmFor, lastPerf, buildPlayerDay, rpeDelta, parseGrid, parseText, normName).
+- **Solo `packages/core/src/entities/` conoce las claves de DynamoDB.** Ni las rutas ni el frontend arman `pk`/`sk` a mano.
+- **Zod es la única validación.** El schema Zod deriva el tipo (`z.infer`); no duplicar interfaces a mano. Las rutas validan input con Zod ANTES de tocar la DB, y ese mismo schema es el que exporta el OpenAPI.
+- **El cliente en `packages/web/generated/` se regenera, no se edita.** Si el contrato cambió, cambió el schema Zod de la ruta.
+- **Nunca confiar en el cliente**: ids, roles y ownership se verifican en la API siempre.
+- **Textos de UI en español** (es-UY, registro "vos" como el prototipo: "Poné un nombre", "Elegí tu puesto"). Código, commits e identificadores en inglés.
 - La grafía `Excercise` (doble c) del proyecto .NET **NO se hereda**: acá es `Exercise` en todos lados.
-- Errores de server actions: devolver `{ ok: false, error: string }` tipado, no lanzar excepciones crudas a la UI.
+- Errores de la API: respuesta tipada `{ ok: false, error: string }` con el status correcto, no excepciones crudas.
 - No agregar dependencias sin justificarlo contra la tabla de decisiones (§2).
 
 ### Tests
 
-- **Prioridad 1**: unit tests de `lib/domain/` (Vitest). Cobertura completa de resolveProgram (los 4 niveles + empates), calcLoad (3 loadTypes, sin 1RM, redondeo 0.5), parsers de Excel/texto con planillas reales de ejemplo, normName con acentos.
-- **Prioridad 2**: tests de scoping RBAC (que un coach no vea plantel ajeno, que 404 ≠ 403).
+- **Prioridad 1**: unit tests de `packages/core/src/domain/` (Vitest). Cobertura completa de resolveProgram (los 4 niveles + empates), calcLoad (3 loadTypes, sin 1RM, redondeo 0.5), parsers de Excel/texto con planillas reales de ejemplo, normName con acentos.
+- **Prioridad 2**: tests de rutas de la API con scoping RBAC (que un coach no vea plantel ajeno, que 404 ≠ 403). Hono se testea con `app.request()` sin levantar servidor.
 - E2E (Playwright) recién cuando el flujo coach→jugador→log esté completo.
 
 ### Flujo de trabajo
@@ -140,25 +227,25 @@ components/            # UI compartida (shadcn en components/ui)
 
 ```bash
 pnpm install
-cp .env.example .env.local        # DATABASE_URL de Neon, AUTH_SECRET
-pnpm prisma migrate dev
-pnpm prisma db seed               # 8 posiciones, Forwards/Backs, ~48 ejercicios, admin
-pnpm dev                          # http://localhost:3000
+npx sst secret set JwtSecret "<algo largo y aleatorio>"
+pnpm sst dev                      # tabla, API y Nuxt en modo live contra tu stage personal
+pnpm seed                         # catálogo de ejercicios + admin (nunca en production)
 ```
 
-Usuarios seed (solo dev): admin definido en seed; coach/jugador demo se crean por UI.
+`sst dev` corre las Lambdas localmente contra recursos reales de tu stage. No hay docker ni base local que administrar.
 
 ---
 
 ## 6. Roadmap y estado
 
 Marcar `[x]` al completar cada fase. Al iniciar sesión de trabajo, buscar la primera fase incompleta.
+Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 
-- [ ] **F0 — Setup**: proyecto Next + Prisma + schema completo + Neon + Auth.js/argon2 + seed.
-- [ ] **F1 — Auth y shell**: registro/login, middleware, layout con sidebar, vínculo jugador↔coach por invite code.
+- [ ] **F0 — Setup**: monorepo pnpm + SST, tabla DynamoDB, entidades ElectroDB, Hono con OpenAPI, Nuxt SSR, funciones puras de dominio con tests, deploy al stage personal.
+- [ ] **F1 — Auth y shell**: registro/login con JWT en cookie, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code.
 - [ ] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 3 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import Excel/texto**.
 - [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
-- [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; deploy Vercel + Neon; seed off en prod.
+- [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; stage `production`; seed off en prod.
 
 ---
 
@@ -166,6 +253,7 @@ Marcar `[x]` al completar cada fase. Al iniciar sesión de trabajo, buscar la pr
 
 1. Leer este archivo entero.
 2. Ver estado del roadmap (§6) y el último commit para ubicar dónde quedó el trabajo.
-3. Si la tarea toca comportamiento de producto y hay duda → consultar `coach.html` / `README-CoachLab.md` como espec.
-4. Si la tarea toca el contrato de datos → el schema Prisma manda; cambios de schema requieren migración + actualizar §3 si cambia el dominio.
-5. No reabrir decisiones de §2 sin plantearlo explícitamente al dueño del repo.
+3. Si la tarea toca comportamiento de producto y hay duda → consultar `coach.html` / `README-CoachLab.md` como espec (mientras falten, decirlo en vez de inventar).
+4. Si la tarea toca el contrato de datos → `packages/core/src/entities/` manda; cambiar un access pattern obliga a revisar los índices en `infra/storage.ts` y actualizar §3.
+5. Si encontrás una referencia a Next.js, Prisma, PostgreSQL, Neon, Auth.js, shadcn/ui o Vercel → es residuo del stack descartado. Corregila y avisá.
+6. No reabrir decisiones de §2 sin plantearlo explícitamente al dueño del repo.
