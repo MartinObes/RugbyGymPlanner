@@ -95,6 +95,10 @@ No se corrigieron en F1 a propósito: son SQL de seguridad que hoy no se puede a
 verificar en vivo (§5), y el fix de M-1 diseña parte de F3. Escribirlos a ciegas era más riesgo
 que valor.
 
+**El plan de corrección completo (migración 0005 + checks en vivo) está en
+`docs/superpowers/plans/2026-07-28-rbac-hardening.md`.** Se ejecuta con las mismas credenciales
+de §5 — si se corre junto, un solo `db push` aplica 0004 y 0005.
+
 ## 5. Pendiente para cerrar la fase (necesita credenciales)
 
 En orden, con las variables del dueño del repo (ver `IMPLEMENTATION-F0.md` §6 para dónde vive
@@ -116,7 +120,9 @@ $env:SUPABASE_ANON_KEY="sb_publishable_..."
 pnpm verify:setup
 
 # 4. Suite completa + flujo manual del plan (Task 12 Step 2)
-pnpm typecheck && pnpm test && pnpm dev
+#    (así y no con && — Windows PowerShell 5.1 no lo soporta)
+pnpm typecheck; if ($?) { pnpm test }
+pnpm dev
 ```
 
 Al pasar todo: commitear `types/database.ts`, marcar el checkbox de F1 en `CLAUDE.md` §6 y
