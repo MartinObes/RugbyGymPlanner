@@ -20,23 +20,33 @@ export type AuthVariables = {
  * costando lo mismo que en F0.
  */
 export const withActor = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
-  const supabase = createRequestClient({
-    getAll: () =>
-      parseCookieHeader(c.req.header('cookie') ?? '').map(({ name, value }) => ({
-        name,
-        value: value ?? '',
-      })),
-    // Si Supabase refresca el token durante el request, el Set-Cookie viaja en
-    // esta misma respuesta y el browser queda al día.
-    setAll: (cookies) => {
-      for (const { name, value, options } of cookies) {
-        c.header('Set-Cookie', serializeCookieHeader(name, value, options), { append: true })
-      }
-    },
-  })
+  c.set('actor', null)
+
+  let supabase: SupabaseClient
+  try {
+    supabase = createRequestClient({
+      getAll: () =>
+        parseCookieHeader(c.req.header('cookie') ?? '').map(({ name, value }) => ({
+          name,
+          value: value ?? '',
+        })),
+      // Si Supabase refresca el token durante el request, el Set-Cookie viaja en
+      // esta misma respuesta y el browser queda al día.
+      setAll: (cookies) => {
+        for (const { name, value, options } of cookies) {
+          c.header('Set-Cookie', serializeCookieHeader(name, value, options), { append: true })
+        }
+      },
+    })
+  } catch {
+    // Sin SUPABASE_URL/ANON_KEY (tests, CI) no hay sesión que resolver y no
+    // puede haber actor, así que los guards cortan antes de que ninguna ruta
+    // toque `db`. El health reporta 'unconfigured' por su cuenta — la falta de
+    // configuración se informa, no tira abajo la API (lección de F0).
+    return next()
+  }
 
   c.set('db', supabase)
-  c.set('actor', null)
 
   const {
     data: { user },

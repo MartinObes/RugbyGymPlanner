@@ -38,3 +38,41 @@ describe('app', () => {
     expect((await res.json()) as ErrorBody).toEqual({ ok: false, error: 'No encontrado' })
   })
 })
+
+// Sin cookie no hay ningún viaje a Supabase (getUser corta en memoria), así
+// que estos tests corren offline.
+describe('guards de F1', () => {
+  it('GET /api/auth/me sin sesión → 401 tipado', async () => {
+    const res = await app.request('/api/auth/me')
+    expect(res.status).toBe(401)
+    expect((await res.json()) as ErrorBody).toEqual({ ok: false, error: 'No autorizado' })
+  })
+
+  it('GET /api/coach/players sin sesión → 401', async () => {
+    const res = await app.request('/api/coach/players')
+    expect(res.status).toBe(401)
+  })
+
+  it('GET /api/admin/stats sin sesión → 401', async () => {
+    const res = await app.request('/api/admin/stats')
+    expect(res.status).toBe(401)
+  })
+
+  it('el prefijo /player/* ya nace guardado aunque no tenga rutas', async () => {
+    const res = await app.request('/api/player/anything')
+    expect(res.status).toBe(401)
+  })
+
+  it('el spec incluye las rutas nuevas', async () => {
+    const res = await app.request('/api/openapi.json')
+    const spec = (await res.json()) as OpenApiSpec
+    expect(spec.paths).toHaveProperty('/api/auth/me')
+    expect(spec.paths).toHaveProperty('/api/coach/players')
+    expect(spec.paths).toHaveProperty('/api/admin/stats')
+  })
+
+  it('el health sigue público y vivo (UptimeRobot depende de él)', async () => {
+    const res = await app.request('/api/health')
+    expect(res.status).toBe(200)
+  })
+})
