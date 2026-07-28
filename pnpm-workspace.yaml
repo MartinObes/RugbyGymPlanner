@@ -19,3 +19,10 @@ overrides:
 allowBuilds:
   esbuild: true
   vue-demi: true
+
+# Lo mismo en la sintaxis de pnpm 10. Duplicado a propósito: Vercel elige la
+# versión de pnpm por el lockfile y puede usar la 10, que ignora `allowBuilds`.
+# Sin esta lista el build remoto no correría el postinstall de esbuild.
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi

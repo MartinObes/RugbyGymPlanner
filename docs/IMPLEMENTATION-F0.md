@@ -23,7 +23,7 @@ F0 está **implementado y verificado localmente**. Lo que falta no es código: s
 | Cliente TS generado desde el contrato | ✅ generado offline |
 | Nuxt SSR con la API montada en Nitro | ✅ verificado contra la base real: `db: "ok"` |
 | Build para Vercel | ✅ completa |
-| Tipos del schema (`types/database.ts`) | ⏸ falta un access token o Docker (§6.3) |
+| Tipos del schema (`types/database.ts`) | ✅ generados: 14 tablas + 8 funciones de RLS |
 | Seed | ✅ **corrido**, e idempotente comprobado |
 | Deploy a Vercel | ⏸ pendiente (§6.6) |
 
@@ -289,21 +289,29 @@ Dos cosas que costaron y conviene no volver a averiguar:
 - El hostname del pooler **incluye la región** y el dashboard es el único lugar que la dice. Acá es
   `aws-0-sa-east-1`, y el usuario es `postgres.<ref>`, no `postgres`.
 
-### ⏸ 6.3. Tipos del schema — bloqueado
+### ✅ 6.3. Tipos del schema — hecho
 
-`pnpm gen:types` necesita **una de estas dos** y no hay ninguna:
+`packages/web/types/database.ts` tiene las 14 tablas y las 8 funciones helper de RLS. Para
+regenerarlo después de cada migración hace falta **un Personal Access Token** (o Docker, que habilita
+la variante `--db-url` levantando un contenedor de `pg_meta`):
 
-- **Un Personal Access Token** (recomendado): crearlo en
-  supabase.com/dashboard/account/tokens y después:
-  ```powershell
-  $env:SUPABASE_ACCESS_TOKEN="sbp_..."
-  $env:SUPABASE_PROJECT_ID="hiceiurkvznfhujtjfar"
-  pnpm gen:types
-  ```
-- **Docker Desktop**, que deja usar la variante `--db-url` (levanta un contenedor de `pg_meta`).
+```powershell
+$env:SUPABASE_ACCESS_TOKEN="sbp_..."   # supabase.com/dashboard/account/tokens
+pnpm exec supabase gen types typescript --project-id hiceiurkvznfhujtjfar --schema public > packages/web/types/database.ts
+```
 
-No bloquea nada hoy: ningún archivo importa `types/database.ts` todavía. Sí hace falta en F1, cuando
-empiecen las queries tipadas.
+> El PAT se muestra **una sola vez**, al crearlo. Después el dashboard lo enmascara
+> (`sbp_f240••••f166`) y esos puntos son literales, no el token.
+
+**Ojo con los dominios:** `load_type` sale tipado como `string`, no como
+`'WEIGHT' | 'PERCENTAGE' | 'NONE'`. Es porque el schema usa **dominios** de Postgres y no `ENUM`: un
+dominio viaja como su tipo base. La restricción sigue garantizada por la base (el `CHECK` está), pero
+TypeScript no la ve. Lo mismo con `role`, `position_id` y `system_group_id`.
+
+Alineado con `CLAUDE.md` §5 ("Zod valida los bordes; la base valida los invariantes"), las uniones
+literales van a salir de los schemas de `packages/core/src/validators/`, que se parsean en el borde.
+Si en algún momento se prefiere que los tipos generados las traigan solas, hay que migrar esos cuatro
+dominios a `ENUM` — es una migración nueva y un cambio a §3.
 
 ### ✅ 6.4. Seed — hecho
 
@@ -329,18 +337,101 @@ Authentication → Users.
 `GET /api/health` → `{"ok":true,"service":"coachlab-api","db":"ok"}`, y la página SSR muestra
 **"Conectada"**.
 
-### ⏸ 6.6. Desplegar a Vercel
+### ⏸ 6.6. Desplegar a Vercel — paso a paso
 
-1. Importar el repo en vercel.com.
-2. Root Directory: `packages/web`. Framework: Nuxt (lo detecta solo).
-3. Environment Variables: `SUPABASE_URL` y `SUPABASE_ANON_KEY` (los mismos valores del `.env`).
-4. Deploy.
+**Paso 0 — publicar el código.** Vercel despliega desde GitHub, así que primero:
 
-### ⏸ 6.7. El keepalive
+```powershell
+git push origin feature/f0
+```
 
-Crear un monitor HTTP gratis en uptimerobot.com apuntando a `https://<tu-app>.vercel.app/api/health`
-cada 5 minutos. Es lo que evita que Supabase pause el proyecto, y de paso avisa por mail si algo se
-cae (`CLAUDE.md` §2).
+Decisión previa: Vercel llama **Production** al deploy de su *production branch* (por defecto `main`)
+y **Preview** a cualquier otra rama. Como F0 está terminada, lo natural es mergear a `main` y que el
+primer deploy sea de producción:
+
+```powershell
+git checkout main
+git merge --no-ff feature/f0 -m "feat: F0 setup on Supabase + Vercel"
+git push origin main
+```
+
+Si preferís ver un preview antes de tocar `main`, alcanza con pushear `feature/f0`: Vercel te da una
+URL de preview por rama sin que Production cambie.
+
+**Paso 1 — importar el proyecto.** En vercel.com: *Add New… → Project → Import Git Repository →
+`MartinObes/RugbyGymPlanner`*. Si no aparece, hay que darle permiso a la app de GitHub sobre ese repo.
+
+**Paso 2 — configurar. Acá es donde falla si te apurás:**
+
+| Campo | Valor |
+|---|---|
+| Framework Preset | **Nuxt.js** |
+| Root Directory | **`packages/web`** |
+| **Include files outside of the Root Directory** | ✅ **ACTIVAR** |
+| Build Command | dejar el default |
+| Output Directory | dejar el default |
+| Install Command | dejar el default |
+| Node.js Version | 22.x |
+
+El checkbox de "include files outside" es el que importa: `packages/web` depende de `@coachlab/core`
+y `@coachlab/api`, que viven **fuera** de esa carpeta. Sin eso, `pnpm install` no encuentra los
+paquetes del workspace y el build muere.
+
+No hace falta tocar Output Directory: `nuxt.config.ts` tiene `nitro.preset: 'vercel'`, así que el
+build escribe `.vercel/output` y Vercel lo levanta solo.
+
+**Paso 3 — variables de entorno.** Antes de darle Deploy, en *Environment Variables*:
+
+| Name | Value | Environments |
+|---|---|---|
+| `SUPABASE_URL` | `https://hiceiurkvznfhujtjfar.supabase.co` | Production, Preview, Development |
+| `SUPABASE_ANON_KEY` | la publishable key (`sb_publishable_…`) | Production, Preview, Development |
+
+Son los mismos dos valores de `packages/web/.env`. **La secret key no va acá**: nada que corra en
+respuesta a un request la usa (`CLAUDE.md` §4).
+
+**Paso 4 — Deploy.**
+
+**Paso 5 — verificar.** Con la URL que te da Vercel:
+
+- `https://<tu-app>.vercel.app/api/health` → `{"ok":true,"service":"coachlab-api","db":"ok"}`
+- `https://<tu-app>.vercel.app/` → la home muestra **"Conectada"**
+
+Si `db` dice `unconfigured`, faltan las variables de entorno o se guardaron sin cubrir el environment
+de Production. Si dice `error`, las variables están pero Supabase rechazó la consulta.
+
+**Si el build falla en el install**, el sospechoso número uno es la versión de pnpm. El repo declara
+`"packageManager": "pnpm@11.17.0"`, y Vercel elige su pnpm por el `lockfileVersion` (acá `9.0`), que
+puede darle la 9 o la 10. Por eso `pnpm-workspace.yaml` declara la lista de scripts permitidos **en
+las dos sintaxis** (`allowBuilds` de pnpm 11 y `onlyBuiltDependencies` de pnpm 10). Si aun así se
+queja de la versión, sacar el campo `packageManager` del `package.json` raíz y volver a desplegar.
+
+### ⏸ 6.7. El keepalive con UptimeRobot — paso a paso
+
+Cumple dos funciones: mantener la base activa para que Supabase no pause el proyecto a los 7 días, y
+avisarte por mail antes que ningún jugador se entere de que algo se cayó.
+
+1. Crear cuenta gratis en **uptimerobot.com** (50 monitores, sin tarjeta).
+2. *Add New Monitor*.
+3. **Monitor Type: `Keyword`** — no `HTTP(s)`. Ver el porqué abajo, es importante.
+4. Friendly Name: `CoachLab health`
+5. URL: `https://<tu-app>.vercel.app/api/health`
+6. **Keyword Type: `Keyword not exists`** (alertar cuando la palabra NO aparezca)
+7. **Keyword: `"db":"ok"`**
+8. Monitoring Interval: **5 minutos**
+9. Alert Contacts: tu mail, tildado
+10. *Create Monitor*
+
+**Por qué Keyword y no HTTP(s).** `/api/health` está diseñado para **no devolver nunca un 500**: si
+Supabase no responde, igual contesta `200` con `{"ok":true,...,"db":"error"}`, porque un health check
+que se cae no te deja diagnosticar nada. La contrapartida es que un monitor HTTP común vería `200` y
+nunca te avisaría de un problema de base. El monitor de keyword mira el cuerpo y salta cuando
+`"db":"ok"` desaparece.
+
+**Sobre el intervalo.** 5 minutos son ~8.600 requests por día, ~260k por mes: alrededor del 26% del
+millón de edge requests que da Vercel Hobby. Entra cómodo. Si querés ser conservador, 30 minutos
+sigue siendo muchísimo para evitar una pausa por inactividad de 7 días y usa la sexta parte de esa
+cuota, a cambio de enterarte de una caída hasta media hora más tarde.
 
 ### 🔐 6.8. Rotar la contraseña de la base
 
