@@ -1,6 +1,16 @@
 packages:
   - "packages/*"
 
+# Una sola versión de h3 en todo el árbol.
+#
+# Nuxt, Nitro, @nuxt/ui y unstorage corren sobre h3 v1; la v2 la arrastraba una
+# sola cadena de devtools (devframe → @vitejs/devtools-kit → @unhead/bundler).
+# Con las dos conviviendo, el auto-import de Nitro resolvía la v2 en
+# server/api/[...].ts — que ya no exporta `toWebRequest` — y TODOS los requests
+# a /api morían con un error de módulo. Se fija la v1, que es la que corre.
+overrides:
+  h3: 1.15.11
+
 # pnpm 11 exige declarar qué paquetes pueden correr scripts de instalación.
 # esbuild sí: linkea su binario nativo y sin él no arrancan vitest ni tsx.
 # vue-demi sí: su postinstall elige el shim de Vue 2 o Vue 3 según la versión

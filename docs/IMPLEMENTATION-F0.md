@@ -16,15 +16,30 @@ F0 está **implementado y verificado localmente**. Lo que falta no es código: s
 |---|---|
 | Monorepo pnpm con 3 paquetes | ✅ funcionando |
 | 4 funciones puras de dominio + 34 tests | ✅ verde |
-| Schema Postgres completo con RLS | ✅ escrito, ⏸ sin aplicar (falta proyecto Supabase) |
+| Schema Postgres completo con RLS | ✅ **aplicado al proyecto real**, sin errores de SQL |
+| RLS efectivamente bloqueando | ✅ **verificada en vivo** (ver §4.2) |
 | API Hono con OpenAPI | ✅ funcionando, 4 tests verdes |
 | Cliente TS generado desde el contrato | ✅ generado offline |
-| Nuxt SSR con la API montada en Nitro | ✅ verificado por HTTP real |
+| Nuxt SSR con la API montada en Nitro | ✅ verificado contra la base real: `db: "ok"` |
 | Build para Vercel | ✅ completa |
-| Seed | ✅ escrito, ⏸ sin correr |
+| Tipos del schema (`types/database.ts`) | ⏸ falta un access token o Docker (§6.3) |
+| Seed | ✅ escrito, ⏸ falta la secret key (§6.4) |
+| Deploy a Vercel | ⏸ pendiente (§6.6) |
 
 Verificación al cierre: `pnpm -r test` → **38 tests en verde**; `pnpm -r typecheck` → los 3 paquetes en
-`Done`; `nuxt build` → `Build complete`.
+`Done`; `nuxt build` → `Build complete`; `GET /api/health` contra el proyecto real →
+`{"ok":true,"service":"coachlab-api","db":"ok"}`.
+
+### Datos del proyecto Supabase
+
+| | |
+|---|---|
+| Project ref | `hiceiurkvznfhujtjfar` |
+| Región | **sa-east-1** (São Paulo) |
+| Host de conexión | `aws-0-sa-east-1.pooler.supabase.com:5432`, usuario `postgres.hiceiurkvznfhujtjfar` |
+
+El host directo (`db.<ref>.supabase.co`) **no existe** en los proyectos nuevos: solo hay pooler, y su
+hostname incluye la región. Si alguna vez hay que reconectar y no se sabe la región, está acá.
 
 ---
 
@@ -164,6 +179,28 @@ Si cambiás el schema Zod de una ruta y no regenerás, **el frontend deja de com
 Comprobado: `pnpm dump:openapi` → `1 path(s): /api/health`; el cliente generado expone `getApiHealth()`
 tipada; la página consume `HealthResponse` y `nuxt typecheck` pasa.
 
+## 4.2. RLS verificada en vivo
+
+Contra el proyecto real, usando solo la clave publishable (rol `anon`, sin sesión):
+
+```
+GET /rest/v1/profiles?select=*      → []
+GET /rest/v1/exercises?select=*     → []
+GET /rest/v1/programs?select=*      → []
+GET /rest/v1/session_logs?select=*  → []
+GET /rest/v1/one_rms?select=*       → []
+
+POST /rest/v1/exercises  → 42501: new row violates row-level security policy
+```
+
+Las tablas existen y responden, pero no entregan una sola fila y rechazan la escritura. Es la capa 1
+de `CLAUDE.md` §4 haciendo su trabajo.
+
+Ojo con qué prueba esto y qué no: prueba que **RLS está habilitada y que el default es negar**. No
+prueba que las políticas por rol sean correctas — que un coach vea exactamente su plantel y no el
+ajeno, que un jugador no edite el log de otro. Eso necesita usuarios reales de cada rol y es lo
+primero a testear en F1.
+
 ---
 
 ## 5. Problemas que aparecieron y cómo se resolvieron
@@ -179,90 +216,120 @@ que exista el entorno de producción.**
 **2. ElectroDB no puede hacer índices sparse** *(del stack viejo, ya no aplica)*
 Descrito en §2. Se verificó empíricamente antes de concluir nada.
 
-**3. Dos versiones de h3 en el árbol** ⚠ **este sí sigue vigente**
-Nuxt 4 usa **h3 1.15.11** en runtime, pero el árbol también tiene **h3 2.0.1-rc** como dependencia
-transitiva. El auto-import de Nitro resolvía `toWebRequest` a la v2, que ya no lo exporta, y **todos los
-requests a la API morían** con un error de módulo. Peor: el primer intento de arreglarlo con la API de
-h3 v2 (`event.req`) hizo que Hono recibiera un path relativo en vez de una URL absoluta, y su router
-mandó todo al 404 sin ningún error visible.
+**3. Dos versiones de h3 en el árbol** — resuelto, pero conviene entenderlo
+Nuxt 4 usa **h3 1.15.11** en runtime, pero el árbol también traía **h3 2.0.1-rc** por una única cadena
+de devtools (`devframe` → `@vitejs/devtools-kit` → `@unhead/bundler` → `@unhead/vue`). El auto-import de
+Nitro resolvía `toWebRequest` a la v2, que ya no lo exporta, y **todos los requests a la API morían**
+con un error de módulo. Peor: el primer intento de arreglarlo con la API de h3 v2 (`event.req`) hizo que
+Hono recibiera un path relativo en vez de una URL absoluta, y su router mandó todo al 404 **sin ningún
+error visible**.
 
-La solución está en `packages/web/server/api/[...].ts`: **h3 fijado en el `package.json` de `web` e
-importado explícitamente**, en vez de confiar en el auto-import. Si algún día los requests a `/api`
-empiezan a dar 404 sin motivo, mirar acá primero.
+Resuelto en dos niveles:
+
+1. **`overrides: { h3: 1.15.11 }`** en `pnpm-workspace.yaml` — una sola versión en todo el árbol.
+   Verificado con `pnpm why h3` → `Found 1 version of h3`, y con tests, typecheck y build en verde.
+   (En pnpm 11 los overrides van en `pnpm-workspace.yaml`, no en el campo `pnpm` del `package.json`;
+   ahí los ignora en silencio con un warning.)
+2. **h3 declarado en `packages/web` e importado explícitamente** en `server/api/[...].ts`, en vez de
+   confiar en el auto-import. Es redundante con lo anterior a propósito: si mañana otra dependencia
+   vuelve a meter una segunda versión, el import explícito sigue resolviendo bien.
+
+Si algún día los requests a `/api` empiezan a dar 404 sin motivo, mirar acá primero.
 
 ---
 
-## 6. Qué falta y cómo terminarlo
+## 6. Estado del setup
 
-Nada de esto es código: son cuentas que solo vos podés crear. Ninguna pide tarjeta.
+### ✅ 6.1. Proyecto de Supabase — hecho
 
-### 6.1. Crear el proyecto de Supabase
+Creado en **sa-east-1**. `packages/web/.env` tiene `SUPABASE_URL` y `SUPABASE_ANON_KEY`, y está
+gitignoreado (verificado con `git check-ignore`).
 
-1. Crear cuenta y proyecto en supabase.com (región más cercana: `sa-east-1`, São Paulo).
-2. Project Settings → API → copiar `Project URL` y la `anon public` key.
-3. `cp packages/web/.env.example packages/web/.env` y completar las dos variables.
+> **Nomenclatura:** Supabase renombró sus claves en 2025. La **`publishable key`** (`sb_publishable_…`)
+> es la que antes se llamaba **`anon`**; va en el navegador y no es secreta — lo que protege los datos
+> es RLS. La **`secret key`** (`sb_secret_…`) es la vieja `service_role`, saltea RLS y solo puede
+> aparecer en el seed y en scripts a mano (`CLAUDE.md` §4). En el código la variable sigue llamándose
+> `SUPABASE_ANON_KEY` porque es el nombre que espera `supabase-js`.
 
-### 6.2. Aplicar el schema
+### ✅ 6.2. Schema aplicado — hecho
 
 ```powershell
-pnpm supabase login
-pnpm supabase link --project-ref <tu-project-ref>
-pnpm supabase db push
+pnpm exec supabase db push --db-url "postgresql://postgres.hiceiurkvznfhujtjfar:<PASSWORD>@aws-0-sa-east-1.pooler.supabase.com:5432/postgres" --include-all
 ```
 
-Esto aplica las tres migraciones. **Todavía no se corrió contra una base real**: es el primer paso donde
-puede aparecer un error de SQL, y es esperable que haya que ajustar algo.
+Las tres migraciones aplicaron **sin un solo error de SQL**. No hizo falta `supabase login` ni
+`link`: con `--db-url` alcanza.
 
-### 6.3. Regenerar los tipos del schema
+Dos cosas que costaron y conviene no volver a averiguar:
+
+- El host directo `db.<ref>.supabase.co` **ya no existe** en proyectos nuevos. Hay que usar el pooler.
+- El hostname del pooler **incluye la región** y el dashboard es el único lugar que la dice. Acá es
+  `aws-0-sa-east-1`, y el usuario es `postgres.<ref>`, no `postgres`.
+
+### ⏸ 6.3. Tipos del schema — bloqueado
+
+`pnpm gen:types` necesita **una de estas dos** y no hay ninguna:
+
+- **Un Personal Access Token** (recomendado): crearlo en
+  supabase.com/dashboard/account/tokens y después:
+  ```powershell
+  $env:SUPABASE_ACCESS_TOKEN="sbp_..."
+  $env:SUPABASE_PROJECT_ID="hiceiurkvznfhujtjfar"
+  pnpm gen:types
+  ```
+- **Docker Desktop**, que deja usar la variante `--db-url` (levanta un contenedor de `pg_meta`).
+
+No bloquea nada hoy: ningún archivo importa `types/database.ts` todavía. Sí hace falta en F1, cuando
+empiecen las queries tipadas.
+
+### ⏸ 6.4. Seed — falta la secret key
 
 ```powershell
-$env:SUPABASE_PROJECT_ID="<tu-project-ref>"; pnpm gen:types
-```
-
-Escribe `packages/web/types/database.ts`. Ese archivo todavía no existe porque no hay schema aplicado.
-
-### 6.4. Correr el seed
-
-```powershell
-$env:SUPABASE_URL="https://xxxx.supabase.co"
-$env:SUPABASE_SERVICE_ROLE_KEY="<service_role key>"
+$env:SUPABASE_URL="https://hiceiurkvznfhujtjfar.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."   # Settings → API Keys → secret
 $env:SEED_ADMIN_EMAIL="admin@coachlab.local"
 $env:SEED_ADMIN_PASSWORD="<algo largo>"
 pnpm seed
 ```
 
 Esperado: `✓ 24 ejercicios`, `✓ admin ... creado`, `✓ admin ... con rol ADMIN`. Correrlo dos veces tiene
-que dar el mismo resultado con `ya existía`.
+que dar lo mismo con `ya existía`.
 
-### 6.5. Verificar en local
+### ✅ 6.5. Verificación local — hecha
 
-```powershell
-pnpm dev
-```
+`GET /api/health` → `{"ok":true,"service":"coachlab-api","db":"ok"}`, y la página SSR muestra
+**"Conectada"**.
 
-Abrir `http://localhost:3000`. Esperado: la base pasa de **"Falta configurar…"** a **"Conectada"**. Hoy
-muestra lo primero, que es el comportamiento correcto sin proyecto.
-
-### 6.6. Desplegar a Vercel
+### ⏸ 6.6. Desplegar a Vercel
 
 1. Importar el repo en vercel.com.
 2. Root Directory: `packages/web`. Framework: Nuxt (lo detecta solo).
-3. Environment Variables: `SUPABASE_URL` y `SUPABASE_ANON_KEY`.
+3. Environment Variables: `SUPABASE_URL` y `SUPABASE_ANON_KEY` (los mismos valores del `.env`).
 4. Deploy.
 
-### 6.7. El keepalive
+### ⏸ 6.7. El keepalive
 
 Crear un monitor HTTP gratis en uptimerobot.com apuntando a `https://<tu-app>.vercel.app/api/health`
-cada 5 minutos. Es lo que evita que Supabase pause el proyecto, y de paso te avisa por mail si algo se
+cada 5 minutos. Es lo que evita que Supabase pause el proyecto, y de paso avisa por mail si algo se
 cae (`CLAUDE.md` §2).
+
+### 🔐 6.8. Rotar la contraseña de la base
+
+La contraseña de Postgres se compartió por chat durante el setup. Rotarla en
+Supabase → Settings → Database → **Reset database password**. No está guardada en ningún archivo del
+repo, así que rotarla no rompe nada: solo hay que usar la nueva la próxima vez que se corra
+`db push`.
 
 ---
 
 ## 7. Deuda conocida
 
-- **Las políticas de RLS no se probaron nunca contra una base real.** Están escritas con cuidado y
-  comentadas, pero una política mal escrita no la agarra ningún test de código. `CLAUDE.md` §5 las pone
-  como prioridad 3 de testing; conviene subirlas a prioridad 1 apenas exista el proyecto.
+- **Las políticas de RLS solo se probaron con el rol `anon`.** El smoke test de §4.2 confirma que RLS
+  está habilitada y que el default es negar, pero **ninguna política por rol se ejercitó**: nadie
+  verificó todavía que un coach vea exactamente su plantel, que un jugador no lea el log de otro, o
+  que el trigger `guard_profile_changes` frene un intento de `role = 'ADMIN'`. Eso necesita usuarios
+  reales de cada rol. `CLAUDE.md` §5 lo pone como prioridad 3 de testing; **conviene subirlo a
+  prioridad 1 en F1**, que es cuando aparecen los usuarios.
 - **El mapeo puesto → grupo system está duplicado**: en `positions.ts` y en la función
   `my_system_group_id()` de `0003`. Son 8 valores que por decisión de `CLAUDE.md` §2 nunca cambian, pero
   está anotado en el SQL.
