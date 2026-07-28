@@ -27,7 +27,7 @@ del dueño del repo antes del merge a `main`.
 | Login, registro, shell con sidebar, páginas por rol | ✅ `Build complete` |
 | Typecheck | ✅ verde en los 3 paquetes (tipos regenerados con el rpc) |
 | Auditoría `rbac-auditor` | ✅ **APTO PARA MERGE** — hallazgos de F0 en §4 |
-| Verificación en vivo | ✅ smoke 10/10 contra el dev server: cookie real de `@supabase/ssr` → `withActor` → `/auth/me`, scoping de players, 401 de admin, SSR con el invite code renderizado |
+| Verificación en vivo | ✅ smoke 12/12 contra el dev server: cookie real de `@supabase/ssr` → `withActor` → `/auth/me`, scoping de players, 401 de admin, SSR con el invite code y el shell (layouts) renderizados |
 
 Tests: **57 en core + 14 en api = 71 en verde.**
 
@@ -155,7 +155,15 @@ y los checks dependientes ya no fallan en cascada culpando a otra causa.
 UTF-8 y la receta de §5 usa `| Out-File -Encoding utf8`. Si algún día `git diff` muestra ese
 archivo como `Bin`, es esto de nuevo.
 
-**4. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
+**4. Los layouts existían pero no se renderizaban — ningún check automático lo vio.** `app.vue`
+venía de F0 con `<NuxtPage />` a secas; al crear `layouts/` en F1 había que envolverlo en
+`<NuxtLayout>`, y sin eso Nuxt renderiza las páginas SIN layout: ni sidebar ni botón "Salir",
+solo un warning (`NUXT_E4007`) en la consola del server. Lo encontró el dueño en el click-through
+("no puedo salir") — la lección #3 de F0 otra vez: los checks de contenido no ven problemas de
+presentación. El smoke test ahora verifica que el HTML del shell incluya "Salir"/"Plantel" y el
+del layout auth su tagline.
+
+**5. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
 el formato que el CLI actual lee (espera `.temp/project-ref` o `--db-url`), y no hay login
 guardado (`projects list` → `LegacyPlatformAuthRequiredError`). No es un bug del repo: las
 credenciales de F0 pasaron por el chat y se rotaron a propósito (`IMPLEMENTATION-F0.md` §6.8).
