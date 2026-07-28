@@ -1,3 +1,4 @@
+import { createServerClient, type CookieMethodsServer } from '@supabase/ssr'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -35,5 +36,17 @@ export function createUserClient(accessToken: string): SupabaseClient {
 export function createAnonClient(): SupabaseClient {
   return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+/**
+ * Cliente reconstruido desde las cookies del request (las escribe @supabase/ssr
+ * del lado de Nuxt). Es el cliente de la capa de datos de TODAS las rutas
+ * autenticadas: viaja con el JWT del usuario, así que auth.uid() resuelve en
+ * las políticas y RLS filtra sola (CLAUDE.md §4).
+ */
+export function createRequestClient(cookies: CookieMethodsServer): SupabaseClient {
+  return createServerClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
+    cookies,
   })
 }
