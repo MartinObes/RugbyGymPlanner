@@ -17,13 +17,14 @@ F0 está **implementado y verificado localmente**. Lo que falta no es código: s
 | Monorepo pnpm con 3 paquetes | ✅ funcionando |
 | 4 funciones puras de dominio + 34 tests | ✅ verde |
 | Schema Postgres completo con RLS | ✅ **aplicado al proyecto real**, sin errores de SQL |
-| RLS efectivamente bloqueando | ✅ **verificada en vivo** (ver §4.2) |
+| RLS efectivamente bloqueando | ✅ **verificada en vivo** (§4.2) |
+| Trigger de alta, invite code, guard anti-escalación y scoping por rol | ✅ **15/15 con usuarios reales** (§4.3) |
 | API Hono con OpenAPI | ✅ funcionando, 4 tests verdes |
 | Cliente TS generado desde el contrato | ✅ generado offline |
 | Nuxt SSR con la API montada en Nitro | ✅ verificado contra la base real: `db: "ok"` |
 | Build para Vercel | ✅ completa |
 | Tipos del schema (`types/database.ts`) | ⏸ falta un access token o Docker (§6.3) |
-| Seed | ✅ escrito, ⏸ falta la secret key (§6.4) |
+| Seed | ✅ **corrido**, e idempotente comprobado |
 | Deploy a Vercel | ⏸ pendiente (§6.6) |
 
 Verificación al cierre: `pnpm -r test` → **38 tests en verde**; `pnpm -r typecheck` → los 3 paquetes en
@@ -196,10 +197,32 @@ POST /rest/v1/exercises  → 42501: new row violates row-level security policy
 Las tablas existen y responden, pero no entregan una sola fila y rechazan la escritura. Es la capa 1
 de `CLAUDE.md` §4 haciendo su trabajo.
 
-Ojo con qué prueba esto y qué no: prueba que **RLS está habilitada y que el default es negar**. No
-prueba que las políticas por rol sean correctas — que un coach vea exactamente su plantel y no el
-ajeno, que un jugador no edite el log de otro. Eso necesita usuarios reales de cada rol y es lo
-primero a testear en F1.
+Eso prueba que **RLS está habilitada y que el default es negar**. Para las políticas por rol hace
+falta usuarios reales, y de eso se encarga `pnpm verify:setup` (§4.3).
+
+## 4.3. `pnpm verify:setup` — la lógica de auth, ejercitada de verdad
+
+`scripts/verify-setup.mjs` crea tres usuarios de prueba contra el proyecto real, ejercita el trigger
+de alta y las políticas, y los borra al terminar (incluso si algo falla). Cubre lo que ningún unit
+test puede, porque necesita una base y sesiones reales.
+
+**15/15 en la última corrida:**
+
+| Qué verifica | Resultado |
+|---|---|
+| Catálogo con 24 ejercicios y `normName` aplicado | `"Sentadilla Búlgara"` → `sentadilla bulgara` |
+| El trigger creó el perfil del admin y el seed lo promovió | `role=ADMIN` |
+| Un COACH nace con rol COACH, sin `coach_id` | ✅ |
+| Un COACH recibe un `invite_code` de 6 chars del alfabeto sin ambigüedades | ej. `YRDR6H` |
+| Un PLAYER que manda un invite code queda vinculado a ese coach | `coach_id` correcto |
+| Un signup con `role: 'ADMIN'` **cae a PLAYER** | `CLAUDE.md` §4 respetado |
+| Con sesión real, un jugador **no puede** hacerse ADMIN | `No se puede cambiar el rol del perfil` |
+| …pero sí puede cambiar su nombre | ✅ |
+| **RLS por rol**: un jugador ve exactamente 2 perfiles — el suyo y el de su coach | ✅ |
+| Un usuario autenticado sí ve el catálogo completo | 24 ejercicios |
+
+La penúltima fila es la que importa más: confirma que el scoping de `profiles_select` funciona y que
+un jugador no ve el resto del plantel ni usuarios de otros coaches.
 
 ---
 
@@ -282,18 +305,24 @@ Dos cosas que costaron y conviene no volver a averiguar:
 No bloquea nada hoy: ningún archivo importa `types/database.ts` todavía. Sí hace falta en F1, cuando
 empiecen las queries tipadas.
 
-### ⏸ 6.4. Seed — falta la secret key
+### ✅ 6.4. Seed — hecho
 
 ```powershell
 $env:SUPABASE_URL="https://hiceiurkvznfhujtjfar.supabase.co"
 $env:SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."   # Settings → API Keys → secret
 $env:SEED_ADMIN_EMAIL="admin@coachlab.local"
-$env:SEED_ADMIN_PASSWORD="<algo largo>"
+$env:SEED_ADMIN_PASSWORD="<la contraseña del admin>"
 pnpm seed
+pnpm verify:setup    # necesita además SUPABASE_ANON_KEY
 ```
 
-Esperado: `✓ 24 ejercicios`, `✓ admin ... creado`, `✓ admin ... con rol ADMIN`. Correrlo dos veces tiene
-que dar lo mismo con `ya existía`.
+24 ejercicios cargados y el admin creado con rol ADMIN. La segunda corrida devolvió `ya existía`:
+idempotencia comprobada.
+
+**Credenciales del admin** (guardadas fuera del repo, cambiar en el primer login):
+`admin@coachlab.local`. Si se perdió la contraseña, se resetea desde el dashboard de Supabase o
+volviendo a correr el seed con otra — el usuario ya existe, así que hay que resetearla en
+Authentication → Users.
 
 ### ✅ 6.5. Verificación local — hecha
 
@@ -324,12 +353,15 @@ repo, así que rotarla no rompe nada: solo hay que usar la nueva la próxima vez
 
 ## 7. Deuda conocida
 
-- **Las políticas de RLS solo se probaron con el rol `anon`.** El smoke test de §4.2 confirma que RLS
-  está habilitada y que el default es negar, pero **ninguna política por rol se ejercitó**: nadie
-  verificó todavía que un coach vea exactamente su plantel, que un jugador no lea el log de otro, o
-  que el trigger `guard_profile_changes` frene un intento de `role = 'ADMIN'`. Eso necesita usuarios
-  reales de cada rol. `CLAUDE.md` §5 lo pone como prioridad 3 de testing; **conviene subirlo a
-  prioridad 1 en F1**, que es cuando aparecen los usuarios.
+- **Las políticas de RLS están probadas solo en parte.** `pnpm verify:setup` (§4.3) ya cubre el
+  scoping de `profiles` con usuarios reales y el guard anti-escalación. **Lo que falta** es todo lo
+  que todavía no tiene datos: que un coach no vea el plantel de otro coach, que un jugador no lea ni
+  edite el `session_log` de un compañero, y que las políticas del árbol del programa
+  (`weeks`/`days`/`blocks`/`block_exercises`) filtren bien. Se irán agregando a `verify-setup.mjs` a
+  medida que F1 y F2 creen esas entidades.
+- **`verify-setup.mjs` corre contra un proyecto real y usa la secret key.** No tiene guard de
+  producción como el seed. Mientras haya un solo proyecto no importa; cuando exista uno de
+  producción, agregarle el mismo `SEED_TARGET` check.
 - **El mapeo puesto → grupo system está duplicado**: en `positions.ts` y en la función
   `my_system_group_id()` de `0003`. Son 8 valores que por decisión de `CLAUDE.md` §2 nunca cambian, pero
   está anotado en el SQL.

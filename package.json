@@ -11,7 +11,8 @@
     "db:push": "supabase db push",
     "gen:types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public > packages/web/types/database.ts",
     "dump:openapi": "tsx scripts/dump-openapi.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "verify:setup": "node scripts/verify-setup.mjs"
   },
   "devDependencies": {
     "@coachlab/api": "workspace:*",
