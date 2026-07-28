@@ -107,6 +107,9 @@ importers:
       '@hey-api/openapi-ts':
         specifier: ^0.64.0
         version: 0.64.15(magicast@0.5.3)(typescript@5.9.3)
+      '@iconify-json/lucide':
+        specifier: ^1.2.120
+        version: 1.2.120
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
@@ -840,6 +843,9 @@ packages:
     peerDependencies:
       hono: '>=3.9.0'
       zod: ^3.19.1
+
+  '@iconify-json/lucide@1.2.120':
+    resolution: {integrity: sha512-4ECF24fxag1n5tZlPGrbWuCGqhkwD0rvAzfCXretqQb4KEC8Y6ja3khF8qmvpR1Mk0NQDhBTRK3Fr/YoV8QyJw==}
 
   '@iconify/collections@1.0.715':
     resolution: {integrity: sha512-4EP9EOD9qx/Ybu+FtepdxL49FV1mFKsPuLTl06ccwvP5lZyErzTy5CODamEnsnKsYr+8jle2DdlDxqzVBok9hQ==}
@@ -5438,6 +5444,10 @@ snapshots:
     dependencies:
       hono: 4.7.4
       zod: 3.25.76
+
+  '@iconify-json/lucide@1.2.120':
+    dependencies:
+      '@iconify/types': 2.0.0
 
   '@iconify/collections@1.0.715':
     dependencies:

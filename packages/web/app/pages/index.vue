@@ -19,8 +19,14 @@ const DB_LABEL: Record<string, string> = {
 
 <template>
   <UContainer class="py-16">
-    <h1 class="text-2xl font-bold">CoachLab</h1>
-    <p class="mt-1 text-neutral-500">Fase 0 — el esqueleto está en pie.</p>
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold">CoachLab</h1>
+        <p class="mt-1 text-muted">Fase 0 — el esqueleto está en pie.</p>
+      </div>
+      <!-- Vive acá solo para poder probarlo. En F1 se muda al shell con sidebar. -->
+      <ColorModeToggle />
+    </div>
 
     <UAlert
       v-if="error"
@@ -32,11 +38,11 @@ const DB_LABEL: Record<string, string> = {
 
     <dl v-else class="mt-8 grid gap-3">
       <div class="flex items-center gap-3">
-        <dt class="w-28 text-neutral-500">Servicio</dt>
+        <dt class="w-28 text-muted">Servicio</dt>
         <dd class="font-mono">{{ data?.service }}</dd>
       </div>
       <div class="flex items-center gap-3">
-        <dt class="w-28 text-neutral-500">Base</dt>
+        <dt class="w-28 text-muted">Base</dt>
         <dd>
           <UBadge :color="data?.db === 'ok' ? 'success' : 'warning'" variant="subtle">
             {{ data ? (DB_LABEL[data.db] ?? data.db) : '—' }}
