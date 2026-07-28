@@ -11,7 +11,9 @@
 
 F0 está **terminada y en producción**: https://rugby-gym-planner-web.vercel.app
 
-Lo único que queda del setup es el monitor de UptimeRobot (§6.7), que formalmente pertenece a F4.
+El setup está completo de punta a punta: schema aplicado, RLS verificada, seed corrido, deploy andando
+y el keepalive monitoreando. Lo único pendiente es rotar las credenciales que pasaron por el chat
+durante el setup (§6.8).
 
 | | Estado |
 |---|---|
@@ -28,7 +30,7 @@ Lo único que queda del setup es el monitor de UptimeRobot (§6.7), que formalme
 | Tipos del schema (`types/database.ts`) | ✅ generados: 14 tablas + 8 funciones de RLS |
 | Seed | ✅ **corrido**, e idempotente comprobado |
 | Estilos (Nuxt UI + Tailwind) | ✅ arreglados tras el primer deploy — ver §5.3 |
-| Keepalive de UptimeRobot | ⏸ pendiente (§6.7) |
+| Keepalive de UptimeRobot | ✅ monitor de keyword activo, alerta por mail comprobada |
 
 Verificación al cierre: `pnpm -r test` → **38 tests en verde**; `pnpm -r typecheck` → los 3 paquetes en
 `Done`; `nuxt build` → `Build complete`; `GET /api/health` contra el proyecto real →
@@ -422,7 +424,7 @@ puede darle la 9 o la 10. Por eso `pnpm-workspace.yaml` declara la lista de scri
 las dos sintaxis** (`allowBuilds` de pnpm 11 y `onlyBuiltDependencies` de pnpm 10). Si aun así se
 queja de la versión, sacar el campo `packageManager` del `package.json` raíz y volver a desplegar.
 
-### ⏸ 6.7. El keepalive con UptimeRobot — paso a paso
+### ✅ 6.7. El keepalive con UptimeRobot — hecho
 
 Cumple dos funciones: mantener la base activa para que Supabase no pause el proyecto a los 7 días, y
 avisarte por mail antes que ningún jugador se entere de que algo se cayó.
@@ -449,12 +451,23 @@ millón de edge requests que da Vercel Hobby. Entra cómodo. Si querés ser cons
 sigue siendo muchísimo para evitar una pausa por inactividad de 7 días y usa la sexta parte de esa
 cuota, a cambio de enterarte de una caída hasta media hora más tarde.
 
-### 🔐 6.8. Rotar la contraseña de la base
+El monitor quedó activo y en `Up`. Las notificaciones de prueba de UptimeRobot (`TEST: Monitor is
+DOWN` seguida de `TEST: Monitor is UP`) confirmaron que el mail de alerta efectivamente llega, que es
+la mitad que más se suele dejar sin comprobar.
 
-La contraseña de Postgres se compartió por chat durante el setup. Rotarla en
-Supabase → Settings → Database → **Reset database password**. No está guardada en ningún archivo del
-repo, así que rotarla no rompe nada: solo hay que usar la nueva la próxima vez que se corra
-`db push`.
+### 🔐 6.8. Rotar las credenciales del setup
+
+Tres credenciales pasaron por el chat durante el setup. **Ninguna vive en el repo**, así que rotarlas
+no rompe nada — solo hay que usar la nueva la próxima vez que se corra el comando de cada una.
+
+| Credencial | Dónde se rota | Por qué importa |
+|---|---|---|
+| Contraseña de Postgres | Settings → Database → *Reset database password* | Acceso directo a la base, saltea RLS. Se usa en `supabase db push` |
+| Secret key (`sb_secret_…`) | Settings → API Keys | **La más delicada**: saltea RLS por completo. Se usa en `pnpm seed` y `pnpm verify:setup` |
+| Personal Access Token (`sbp_…`) | dashboard/account/tokens | Da acceso a la Management API de la cuenta entera, no solo a este proyecto. Se usa en `gen types` |
+
+La **publishable key** (`sb_publishable_…`) NO hace falta rotarla: está diseñada para viajar al
+navegador y no da acceso a nada por sí sola. Lo que protege los datos es RLS.
 
 ---
 
