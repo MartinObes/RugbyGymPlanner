@@ -1,5 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { requireRole, withActor, type AuthVariables } from './middleware/auth'
+import { onError } from './middleware/error'
+import { admin } from './routes/admin'
+import { auth } from './routes/auth'
 import { health } from './routes/health'
+import { players } from './routes/players'
 
 /**
  * App Hono de CoachLab.
@@ -9,15 +14,24 @@ import { health } from './routes/health'
  * coincide con la ruta desde la que Nitro la llama, y por eso los tests piden
  * '/api/health' igual que producción.
  */
-export const app = new OpenAPIHono().basePath('/api')
-
-app.route('/', health)
+export const app = new OpenAPIHono<{ Variables: AuthVariables }>().basePath('/api')
 
 // Errores tipados según CLAUDE.md §5: nunca una excepción cruda al cliente.
-app.onError((error, c) => {
-  console.error('[api]', error)
-  return c.json({ ok: false as const, error: 'Error interno' }, 500)
-})
+app.onError(onError)
+
+app.use('*', withActor)
+
+// Capa 2 de CLAUDE.md §4: el guard cuelga del PREFIJO, no de cada ruta. Toda
+// ruta nueva bajo /coach, /player o /admin nace protegida. /player/* queda
+// guardado desde ya aunque sus rutas lleguen en F3.
+app.use('/coach/*', requireRole(['COACH', 'ADMIN']))
+app.use('/player/*', requireRole(['PLAYER']))
+app.use('/admin/*', requireRole(['ADMIN']))
+
+app.route('/', health)
+app.route('/', auth)
+app.route('/', players)
+app.route('/', admin)
 
 app.notFound((c) => c.json({ ok: false as const, error: 'No encontrado' }, 404))
 

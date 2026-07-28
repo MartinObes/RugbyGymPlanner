@@ -12,6 +12,7 @@
  *   $env:SUPABASE_URL="https://<ref>.supabase.co"
  *   $env:SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."
  *   $env:SUPABASE_ANON_KEY="sb_publishable_..."
+ *   $env:VERIFY_SIGNUP_EMAIL="tumail+coachlab@gmail.com"   # opcional: cubre el signUp anónimo real
  *   pnpm verify:setup
  *
  * Asume que el seed ya corrió (espera 24 ejercicios y el admin).
@@ -74,6 +75,53 @@ try {
   check('COACH se crea con rol COACH', coach?.role === 'COACH', `role=${coach?.role}`)
   check('COACH recibe invite_code de 6 chars', /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(coach?.invite_code ?? ''), `code=${coach?.invite_code}`)
   check('COACH no tiene coach_id', coach?.coach_id === null)
+
+  // --- RPC de validación del invite code (anon, para el form de registro) ---
+  const anonClient = createClient(URL, ANON, { auth: { persistSession: false } })
+  const { data: coachName } = await anonClient.rpc('coach_name_for_invite', {
+    code: coach.invite_code.toLowerCase(),
+  })
+  check('coach_name_for_invite resuelve el código (case-insensitive)', coachName === 'Coach Test', `-> ${coachName}`)
+
+  const { data: noCoach } = await anonClient.rpc('coach_name_for_invite', { code: 'ZZZZZZ' })
+  check('coach_name_for_invite devuelve null con código inexistente', noCoach === null, `-> ${noCoach}`)
+
+  // --- signUp real (el camino que usa la app, no el admin API) ----------------
+  // Supabase Auth (hosted) valida el dominio del email en el signUp anónimo y
+  // rechaza TLDs reservados como .local — el admin API no. Por eso este check
+  // necesita un buzón real: VERIFY_SIGNUP_EMAIL (ideal con plus-addressing,
+  // ej. tumail+coachlab@gmail.com, así cualquier mail de confirmación te llega
+  // a vos). El usuario se borra al final igual que los demás.
+  const signupEmail = process.env.VERIFY_SIGNUP_EMAIL
+  if (!signupEmail) {
+    check(
+      'signUp real: SALTEADO — seteá VERIFY_SIGNUP_EMAIL para cubrirlo',
+      true,
+      'ej: $env:VERIFY_SIGNUP_EMAIL="tumail+coachlab@gmail.com"',
+    )
+  } else {
+    const { data: signUpData, error: signUpError } = await anonClient.auth.signUp({
+      email: signupEmail,
+      password: 'TestPassw0rd!x9',
+      options: { data: { name: 'SignUp Test', role: 'PLAYER', invite_code: coach.invite_code } },
+    })
+    if (signUpData?.user) created.push(signUpData.user.id)
+    check('signUp anónimo funciona', !signUpError, signUpError?.message ?? '')
+
+    if (!signUpError) {
+      check(
+        'signUp devuelve sesión (confirmación de email apagada)',
+        !!signUpData.session,
+        signUpData.session ? '' : 'ENCENDIDA: apagar en Authentication → Sign In / Providers → Email',
+      )
+      const { data: signedUpProfile } = await admin
+        .from('profiles')
+        .select('coach_id')
+        .eq('id', signUpData.user?.id ?? '')
+        .single()
+      check('el signUp real vinculó al coach por invite code', signedUpProfile?.coach_id === coachId)
+    }
+  }
 
   // --- trigger de alta: PLAYER con invite code ---------------------------
   const playerId = await makeUser('player.test@coachlab.local', {

@@ -6,6 +6,45 @@ export type HealthResponse = {
     db: 'ok' | 'error' | 'unconfigured';
 };
 
+export type MeResponse = {
+    ok: true;
+    user: {
+        id: string;
+        email: string;
+        name: string;
+        role: 'PLAYER' | 'COACH' | 'ADMIN';
+        inviteCode: string | null;
+        coachId: string | null;
+    };
+};
+
+export type ErrorResponse = {
+    ok: false;
+    error: string;
+};
+
+export type CoachPlayer = {
+    id: string;
+    name: string;
+    email: string;
+    positionId: string | null;
+};
+
+export type CoachPlayersResponse = {
+    ok: true;
+    players: Array<CoachPlayer>;
+};
+
+export type AdminStatsResponse = {
+    ok: true;
+    stats: {
+        coaches: number;
+        players: number;
+        admins: number;
+        exercises: number;
+    };
+};
+
 export type GetApiHealthData = {
     body?: never;
     path?: never;
@@ -21,6 +60,81 @@ export type GetApiHealthResponses = {
 };
 
 export type GetApiHealthResponse = GetApiHealthResponses[keyof GetApiHealthResponses];
+
+export type GetApiAuthMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/me';
+};
+
+export type GetApiAuthMeErrors = {
+    /**
+     * Sin sesión
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiAuthMeError = GetApiAuthMeErrors[keyof GetApiAuthMeErrors];
+
+export type GetApiAuthMeResponses = {
+    /**
+     * Sesión válida
+     */
+    200: MeResponse;
+};
+
+export type GetApiAuthMeResponse = GetApiAuthMeResponses[keyof GetApiAuthMeResponses];
+
+export type GetApiCoachPlayersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/players';
+};
+
+export type GetApiCoachPlayersErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiCoachPlayersError = GetApiCoachPlayersErrors[keyof GetApiCoachPlayersErrors];
+
+export type GetApiCoachPlayersResponses = {
+    /**
+     * Plantel
+     */
+    200: CoachPlayersResponse;
+};
+
+export type GetApiCoachPlayersResponse = GetApiCoachPlayersResponses[keyof GetApiCoachPlayersResponses];
+
+export type GetApiAdminStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/stats';
+};
+
+export type GetApiAdminStatsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiAdminStatsError = GetApiAdminStatsErrors[keyof GetApiAdminStatsErrors];
+
+export type GetApiAdminStatsResponses = {
+    /**
+     * Contadores
+     */
+    200: AdminStatsResponse;
+};
+
+export type GetApiAdminStatsResponse = GetApiAdminStatsResponses[keyof GetApiAdminStatsResponses];
 
 export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});

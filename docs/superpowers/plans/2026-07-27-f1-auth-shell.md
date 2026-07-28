@@ -1,5 +1,7 @@
 # F1 — Auth y shell Implementation Plan
 
+> **OBSOLETO — reemplazado por `2026-07-28-f1-auth-shell.md` tras el cambio de stack. Se conserva como registro.**
+
 > ## ⚠ PARCIALMENTE OBSOLETO — cambio de stack del 2026-07-27
 >
 > Este plan se escribió contra **AWS + DynamoDB + ElectroDB + JWT propio**, stack que se
