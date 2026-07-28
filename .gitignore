@@ -9,6 +9,10 @@ dist/
 .env.*
 !.env.example
 
+# Artefactos del CLI de Supabase (cache de versión, credenciales de link).
+supabase/.temp/
+supabase/.branches/
+
 # Generado por `pnpm dump:openapi`. Es un artefacto intermedio: la fuente es el
 # schema Zod de las rutas. El cliente en packages/web/generated/ SÍ se versiona,
 # para que el repo compile sin tener que regenerarlo.
