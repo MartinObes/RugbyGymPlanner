@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+
+# pnpm 11 exige declarar qué paquetes pueden correr scripts de instalación.
+# esbuild sí: linkea su binario nativo y sin él no arrancan vitest ni tsx.
+# aws-sdk v2 no: su postinstall solo arma docs y no lo usamos (usamos SDK v3).
+allowBuilds:
+  esbuild: true
+  aws-sdk: false

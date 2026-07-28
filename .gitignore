@@ -1,0 +1,9 @@
+node_modules/
+.sst/
+.nuxt/
+.output/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
