@@ -9,8 +9,9 @@
 
 ## 1. Resumen
 
-F0 está **implementado y verificado localmente**. Lo que falta no es código: son dos cuentas gratuitas
-(Supabase y Vercel) que solo vos podés crear. El detalle está en §6.
+F0 está **terminada y en producción**: https://rugby-gym-planner-web.vercel.app
+
+Lo único que queda del setup es el monitor de UptimeRobot (§6.7), que formalmente pertenece a F4.
 
 | | Estado |
 |---|---|
@@ -23,9 +24,11 @@ F0 está **implementado y verificado localmente**. Lo que falta no es código: s
 | Cliente TS generado desde el contrato | ✅ generado offline |
 | Nuxt SSR con la API montada en Nitro | ✅ verificado contra la base real: `db: "ok"` |
 | Build para Vercel | ✅ completa |
+| **Desplegado y andando en producción** | ✅ https://rugby-gym-planner-web.vercel.app |
 | Tipos del schema (`types/database.ts`) | ✅ generados: 14 tablas + 8 funciones de RLS |
 | Seed | ✅ **corrido**, e idempotente comprobado |
-| Deploy a Vercel | ⏸ pendiente (§6.6) |
+| Estilos (Nuxt UI + Tailwind) | ✅ arreglados tras el primer deploy — ver §5.3 |
+| Keepalive de UptimeRobot | ⏸ pendiente (§6.7) |
 
 Verificación al cierre: `pnpm -r test` → **38 tests en verde**; `pnpm -r typecheck` → los 3 paquetes en
 `Done`; `nuxt build` → `Build complete`; `GET /api/health` contra el proyecto real →
@@ -239,7 +242,20 @@ que exista el entorno de producción.**
 **2. ElectroDB no puede hacer índices sparse** *(del stack viejo, ya no aplica)*
 Descrito en §2. Se verificó empíricamente antes de concluir nada.
 
-**3. Dos versiones de h3 en el árbol** — resuelto, pero conviene entenderlo
+**3. Nuxt UI sin su hoja de estilos** — el error se veía "verde" en toda verificación automática
+El primer deploy a producción salió **sin un solo estilo**: tipografía serif del navegador, todo
+apilado, los `UBadge` como texto plano. Causa: Nuxt UI 3 necesita un CSS de entrada
+(`app/assets/css/main.css` con `@import "tailwindcss"` y `@import "@nuxt/ui"`) declarado en el campo
+`css` de `nuxt.config.ts`. Sin él los componentes emiten su markup, pero **ninguna clase de Tailwind
+llega a generarse**.
+
+Lo importante no es el fix —dos líneas— sino por qué no se detectó antes: toda la verificación se
+hizo con `curl` + `grep` sobre el HTML, y el HTML estaba perfecto. `nuxt build` tampoco falla, y los
+tests y el typecheck menos. **Ninguna comprobación de contenido detecta un problema de presentación.**
+Ahora el build emite 122 KB de CSS y se verifica que las utilidades usadas por la página
+(`.py-16`, `.text-2xl`, `.font-bold`…) estén realmente en el bundle.
+
+**4. Dos versiones de h3 en el árbol** — resuelto, pero conviene entenderlo
 Nuxt 4 usa **h3 1.15.11** en runtime, pero el árbol también traía **h3 2.0.1-rc** por una única cadena
 de devtools (`devframe` → `@vitejs/devtools-kit` → `@unhead/bundler` → `@unhead/vue`). El auto-import de
 Nitro resolvía `toWebRequest` a la v2, que ya no lo exporta, y **todos los requests a la API morían**
@@ -337,7 +353,7 @@ Authentication → Users.
 `GET /api/health` → `{"ok":true,"service":"coachlab-api","db":"ok"}`, y la página SSR muestra
 **"Conectada"**.
 
-### ⏸ 6.6. Desplegar a Vercel — paso a paso
+### ✅ 6.6. Desplegar a Vercel — hecho
 
 **Paso 0 — publicar el código.** Vercel despliega desde GitHub, así que primero:
 
@@ -394,7 +410,7 @@ respuesta a un request la usa (`CLAUDE.md` §4).
 
 **Paso 5 — verificar.** Con la URL que te da Vercel:
 
-- `https://<tu-app>.vercel.app/api/health` → `{"ok":true,"service":"coachlab-api","db":"ok"}`
+- `https://rugby-gym-planner-web.vercel.app/api/health` → `{"ok":true,"service":"coachlab-api","db":"ok"}`
 - `https://<tu-app>.vercel.app/` → la home muestra **"Conectada"**
 
 Si `db` dice `unconfigured`, faltan las variables de entorno o se guardaron sin cubrir el environment
@@ -415,7 +431,7 @@ avisarte por mail antes que ningún jugador se entere de que algo se cayó.
 2. *Add New Monitor*.
 3. **Monitor Type: `Keyword`** — no `HTTP(s)`. Ver el porqué abajo, es importante.
 4. Friendly Name: `CoachLab health`
-5. URL: `https://<tu-app>.vercel.app/api/health`
+5. URL: `https://rugby-gym-planner-web.vercel.app/api/health`
 6. **Keyword Type: `Keyword not exists`** (alertar cuando la palabra NO aparezca)
 7. **Keyword: `"db":"ok"`**
 8. Monitoring Interval: **5 minutos**

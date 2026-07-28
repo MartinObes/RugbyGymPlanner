@@ -7,6 +7,10 @@ export default defineNuxtConfig({
 
   modules: ['@nuxt/ui'],
 
+  // Obligatorio en Nuxt UI 3: sin esta hoja no se genera ninguna clase de
+  // Tailwind y la app se sirve sin estilos.
+  css: ['~/assets/css/main.css'],
+
   nitro: {
     // Un solo deployable: Nitro sirve el SSR y monta la app Hono en /api.
     preset: 'vercel',

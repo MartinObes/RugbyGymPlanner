@@ -1,0 +1,13 @@
+/**
+ * CSS de entrada de Nuxt UI 3.
+ *
+ * Sin este archivo (y sin referenciarlo en `css` de nuxt.config) los componentes
+ * `U*` renderizan su markup pero ninguna clase de Tailwind existe, así que la app
+ * sale sin estilos: tipografía serif del navegador y todo apilado. Se ve
+ * "funcionando" en el HTML y roto en pantalla.
+ *
+ * Tailwind v4 y el tema de Nuxt UI vienen de las dependencias de @nuxt/ui; no
+ * hace falta instalar tailwindcss por separado ni un tailwind.config.
+ */
+@import "tailwindcss";
+@import "@nuxt/ui";
