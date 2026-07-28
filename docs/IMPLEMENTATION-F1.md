@@ -109,8 +109,10 @@ cada una):
 pnpm exec supabase db push --db-url "postgresql://postgres.hiceiurkvznfhujtjfar:<PASSWORD>@aws-0-sa-east-1.pooler.supabase.com:5432/postgres" --include-all
 
 # 2. Regenerar tipos (PAT) — destraba el único error de typecheck
+#    OJO: con Out-File -Encoding utf8, no con ">" — en Windows PowerShell 5.1
+#    ">" escribe UTF-16 y git pasa a tratar el archivo como binario.
 $env:SUPABASE_ACCESS_TOKEN="sbp_..."
-pnpm exec supabase gen types typescript --project-id hiceiurkvznfhujtjfar --schema public > packages/web/types/database.ts
+pnpm exec supabase gen types typescript --project-id hiceiurkvznfhujtjfar --schema public | Out-File -Encoding utf8 packages/web/types/database.ts
 
 # 3. Verificación en vivo (20 checks; si "confirmación de email apagada" falla,
 #    apagar Confirm email en Authentication → Sign In / Providers → Email)

@@ -400,8 +400,10 @@ Expected: `Applying migration 0005_rbac_hardening.sql...` (y 0004 antes, si no e
 - [ ] **Step 2: Regenerar tipos**
 
 ```powershell
+# Out-File -Encoding utf8, no ">" — en Windows PowerShell 5.1 ">" escribe UTF-16
+# y git pasa a tratar el archivo como binario.
 $env:SUPABASE_ACCESS_TOKEN="sbp_..."
-pnpm exec supabase gen types typescript --project-id hiceiurkvznfhujtjfar --schema public > packages/web/types/database.ts
+pnpm exec supabase gen types typescript --project-id hiceiurkvznfhujtjfar --schema public | Out-File -Encoding utf8 packages/web/types/database.ts
 ```
 
 Expected: `redeem_invite_code` aparece en `Functions`. Verificar:
