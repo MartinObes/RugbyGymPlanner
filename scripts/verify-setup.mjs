@@ -75,6 +75,36 @@ try {
   check('COACH recibe invite_code de 6 chars', /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(coach?.invite_code ?? ''), `code=${coach?.invite_code}`)
   check('COACH no tiene coach_id', coach?.coach_id === null)
 
+  // --- RPC de validación del invite code (anon, para el form de registro) ---
+  const anonClient = createClient(URL, ANON, { auth: { persistSession: false } })
+  const { data: coachName } = await anonClient.rpc('coach_name_for_invite', {
+    code: coach.invite_code.toLowerCase(),
+  })
+  check('coach_name_for_invite resuelve el código (case-insensitive)', coachName === 'Coach Test', `-> ${coachName}`)
+
+  const { data: noCoach } = await anonClient.rpc('coach_name_for_invite', { code: 'ZZZZZZ' })
+  check('coach_name_for_invite devuelve null con código inexistente', noCoach === null, `-> ${noCoach}`)
+
+  // --- signUp real (el camino que usa la app, no el admin API) ----------------
+  const { data: signUpData, error: signUpError } = await anonClient.auth.signUp({
+    email: 'signup.test@coachlab.local',
+    password: 'TestPassw0rd!x9',
+    options: { data: { name: 'SignUp Test', role: 'PLAYER', invite_code: coach.invite_code } },
+  })
+  if (signUpData?.user) created.push(signUpData.user.id)
+  check('signUp anónimo funciona', !signUpError, signUpError?.message ?? '')
+  check(
+    'signUp devuelve sesión (confirmación de email apagada)',
+    !!signUpData?.session,
+    signUpData?.session ? '' : 'ENCENDIDA: apagar en Authentication → Sign In / Providers → Email',
+  )
+  const { data: signedUpProfile } = await admin
+    .from('profiles')
+    .select('coach_id')
+    .eq('id', signUpData?.user?.id ?? '')
+    .single()
+  check('el signUp real vinculó al coach por invite code', signedUpProfile?.coach_id === coachId)
+
   // --- trigger de alta: PLAYER con invite code ---------------------------
   const playerId = await makeUser('player.test@coachlab.local', {
     name: 'Player Test',
