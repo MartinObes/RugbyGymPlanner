@@ -9,26 +9,25 @@
 
 ## 1. Resumen
 
-**El código de F1 está completo y commiteado; la fase NO está cerrada.** Faltan tres pasos que
-necesitan credenciales que no viven en el repo (§5): aplicar la migración 0004, regenerar los
-tipos del schema y correr la verificación en vivo. Hasta ahí, el checkbox de `CLAUDE.md` §6 queda
-sin marcar a propósito.
+**F1 está terminada** (código, migración aplicada y verificación en vivo en verde el
+2026-07-28). El último eslabón — el click-through visual en el browser — quedó como aceptación
+del dueño del repo antes del merge a `main`.
 
 | | Estado |
 |---|---|
 | Validación pura de invite code (`domain/inviteCode`) | ✅ 8 tests |
 | Schemas Zod de auth (`validators/auth`) | ✅ 11 tests |
 | `access/rbac`: `hasRole` + errores 404/401 | ✅ 7 tests |
-| Migración `0004_invite_code_lookup.sql` | ✅ escrita — ⏳ **sin aplicar** (credenciales) |
-| `verify-setup.mjs` extendido (+5 checks: RPC y signUp real) | ✅ escrito — ⏳ sin correr |
+| Migración `0004_invite_code_lookup.sql` | ✅ **aplicada** al proyecto real |
+| `verify-setup.mjs` extendido (+5 checks: RPC y signUp real) | ✅ **20/20 en vivo** |
 | Middleware `withActor` + `requireRole` + errores tipados | ✅ 4 tests |
 | Rutas `/auth/me`, `/coach/players`, `/admin/stats` con guards por prefijo | ✅ 6 tests |
 | Contrato regenerado (openapi.json + cliente hey-api) | ✅ 4 paths |
 | Plugin Supabase SSR/browser + `useAuth` + guard global de rutas | ✅ |
 | Login, registro, shell con sidebar, páginas por rol | ✅ `Build complete` |
-| Typecheck | ⚠ verde salvo **1 error esperado**: el rpc `coach_name_for_invite` no está en `types/database.ts` hasta regenerar tipos |
+| Typecheck | ✅ verde en los 3 paquetes (tipos regenerados con el rpc) |
 | Auditoría `rbac-auditor` | ✅ **APTO PARA MERGE** — hallazgos de F0 en §4 |
-| Verificación en vivo (flujo coach→jugador en el browser) | ⏳ pendiente de credenciales |
+| Verificación en vivo | ✅ smoke 10/10 contra el dev server: cookie real de `@supabase/ssr` → `withActor` → `/auth/me`, scoping de players, 401 de admin, SSR con el invite code renderizado |
 
 Tests: **57 en core + 14 en api = 71 en verde.**
 
@@ -101,6 +100,12 @@ de §5 — si se corre junto, un solo `db push` aplica 0004 y 0005.
 
 ## 5. Pendiente para cerrar la fase (necesita credenciales)
 
+> **HECHO (2026-07-28).** Se deja la receta porque es la misma para cada migración futura
+> (la 0005 del hardening la va a necesitar). Post-cierre quedó una sola cosa: **rotar** la
+> password de Postgres, el PAT y la secret key, que pasaron por el chat durante esta sesión
+> (mismo criterio que `IMPLEMENTATION-F0.md` §6.8). Conviene rotar la password recién después
+> de aplicar la 0005, para no escribirla dos veces.
+
 En orden, con las variables del dueño del repo (ver `IMPLEMENTATION-F0.md` §6 para dónde vive
 cada una):
 
@@ -139,7 +144,18 @@ entorno de producción") mordiendo en forma de middleware. Fix: el `try/catch` d
 actor null — sin cliente no hay actor, los guards cortan antes de que ninguna ruta toque `db`, y
 el health reporta `unconfigured` por su cuenta.
 
-**2. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
+**2. Supabase Auth (hosted) rechaza emails con TLD reservado en el signUp anónimo.** El check
+del "signUp real" usaba `@coachlab.local` como los usuarios del admin API — y falló con
+`Email address is invalid`: el signUp anónimo valida el dominio, el admin API no. El check pasó
+a usar `VERIFY_SIGNUP_EMAIL` (un buzón real con plus-addressing, ej. `tumail+coachlab@gmail.com`)
+y los checks dependientes ya no fallan en cascada culpando a otra causa.
+
+**3. En Windows PowerShell 5.1, `>` escribe UTF-16.** El `gen types` corrido por el dueño dejó
+`types/database.ts` en UTF-16 y git pasó a tratarlo como binario (adiós diffs). Se convirtió a
+UTF-8 y la receta de §5 usa `| Out-File -Encoding utf8`. Si algún día `git diff` muestra ese
+archivo como `Bin`, es esto de nuevo.
+
+**4. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
 el formato que el CLI actual lee (espera `.temp/project-ref` o `--db-url`), y no hay login
 guardado (`projects list` → `LegacyPlatformAuthRequiredError`). No es un bug del repo: las
 credenciales de F0 pasaron por el chat y se rotaron a propósito (`IMPLEMENTATION-F0.md` §6.8).
