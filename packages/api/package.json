@@ -1,20 +1,25 @@
 {
-  "name": "@coachlab/core",
+  "name": "@coachlab/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
-    "./domain/*": "./src/domain/*.ts",
-    "./validators/*": "./src/validators/*.ts"
+    ".": "./src/app.ts",
+    "./openapi": "./src/openapi.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@coachlab/core": "workspace:*",
+    "@hono/zod-openapi": "^0.18.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "hono": "^4.6.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

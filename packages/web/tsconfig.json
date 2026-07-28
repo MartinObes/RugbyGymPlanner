@@ -1,0 +1,10 @@
+{
+  "// nota": "Nuxt 4 genera un tsconfig por entorno en .nuxt/. Este archivo solo los referencia; la config real sale de nuxt.config.ts. No agregar compilerOptions acá.",
+  "files": [],
+  "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
+    { "path": "./.nuxt/tsconfig.server.json" },
+    { "path": "./.nuxt/tsconfig.shared.json" },
+    { "path": "./.nuxt/tsconfig.node.json" }
+  ]
+}

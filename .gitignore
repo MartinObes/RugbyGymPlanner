@@ -1,9 +1,15 @@
 node_modules/
-.sst/
 .nuxt/
 .output/
+.vercel/
+.data/
 dist/
 *.tsbuildinfo
 .env
 .env.*
 !.env.example
+
+# Generado por `pnpm dump:openapi`. Es un artefacto intermedio: la fuente es el
+# schema Zod de las rutas. El cliente en packages/web/generated/ SÍ se versiona,
+# para que el repo compile sin tener que regenerarlo.
+packages/web/openapi.json

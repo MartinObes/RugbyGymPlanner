@@ -1,0 +1,30 @@
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { health } from './routes/health'
+
+/**
+ * App Hono de CoachLab.
+ *
+ * No es un servicio aparte: la monta Nitro en packages/web/server/api/[...].ts,
+ * así que todo el proyecto es un solo deployable en Vercel. El basePath '/api'
+ * coincide con la ruta desde la que Nitro la llama, y por eso los tests piden
+ * '/api/health' igual que producción.
+ */
+export const app = new OpenAPIHono().basePath('/api')
+
+app.route('/', health)
+
+// Errores tipados según CLAUDE.md §5: nunca una excepción cruda al cliente.
+app.onError((error, c) => {
+  console.error('[api]', error)
+  return c.json({ ok: false as const, error: 'Error interno' }, 500)
+})
+
+app.notFound((c) => c.json({ ok: false as const, error: 'No encontrado' }, 404))
+
+// El spec que consume hey-api para generar el cliente tipado del frontend.
+app.doc('/openapi.json', {
+  openapi: '3.0.0',
+  info: { version: '0.1.0', title: 'CoachLab API' },
+})
+
+export type App = typeof app

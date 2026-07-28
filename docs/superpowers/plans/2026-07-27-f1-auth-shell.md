@@ -1,5 +1,22 @@
 # F1 — Auth y shell Implementation Plan
 
+> ## ⚠ PARCIALMENTE OBSOLETO — cambio de stack del 2026-07-27
+>
+> Este plan se escribió contra **AWS + DynamoDB + ElectroDB + JWT propio**, stack que se
+> descartó a mitad de F0. Las razones están en `CLAUDE.md` §1 ("Historial de stack").
+>
+> **Qué sigue siendo válido:** todo lo que describe *comportamiento de producto* — pantallas,
+> flujos, textos de UI, reglas de negocio, criterios de aceptación y casos borde. Esa parte
+> es la que costó pensar y no cambió.
+>
+> **Qué NO usar:** cualquier paso que mencione ElectroDB, entidades, `pk`/`sk`, GSI1/GSI2,
+> `TransactWrite`, items de unicidad, `Resource`, SST, Lambda, argon2 o el JWT propio.
+> El equivalente actual está en `CLAUDE.md` §3 (tablas y `CHECK`) y §4 (RLS + 5 capas).
+>
+> **Antes de ejecutar esta fase:** regenerar el plan contra el stack vigente. Es más barato
+> y más confiable que parchear los pasos de abajo uno por uno.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Que un coach se registre y obtenga su código de invitación, que un jugador se registre con ese
