@@ -6,6 +6,7 @@ import { auth } from './routes/auth'
 import { catalog } from './routes/catalog'
 import { assignments } from './routes/coach/assignments'
 import { groups } from './routes/coach/groups'
+import { programImport } from './routes/coach/import'
 import { players } from './routes/coach/players'
 import { programs } from './routes/coach/programs'
 import { tree } from './routes/coach/tree'
@@ -44,6 +45,7 @@ app.route('/', groups)
 app.route('/', programs)
 app.route('/', tree)
 app.route('/', assignments)
+app.route('/', programImport)
 app.route('/', catalog)
 app.route('/', admin)
 

@@ -165,6 +165,14 @@ export type AssignmentPreviewResponse = {
     rows: Array<AssignmentPreviewRow>;
 };
 
+export type ImportResponse = {
+    ok: true;
+    weeks: number;
+    days: number;
+    exercises: number;
+    createdExercises: Array<string>;
+};
+
 export type Exercise = {
     id: string;
     name: string;
@@ -1278,6 +1286,61 @@ export type GetApiCoachAssignmentsPreviewResponses = {
 };
 
 export type GetApiCoachAssignmentsPreviewResponse = GetApiCoachAssignmentsPreviewResponses[keyof GetApiCoachAssignmentsPreviewResponses];
+
+export type PostApiCoachProgramsByProgramIdImportData = {
+    body?: {
+        weeks: Array<{
+            name: string;
+            days: Array<{
+                name: string;
+                blocks: Array<{
+                    type: 'SINGLE' | 'CIRCUIT';
+                    rounds: number | null;
+                    exercises: Array<{
+                        exerciseName: string;
+                        sets: number;
+                        reps: string;
+                        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+                        weight: number | null;
+                        percentage: number | null;
+                        targetRpe: number | null;
+                    }>;
+                }>;
+            }>;
+        }>;
+        issues: Array<{
+            row: number;
+            message: string;
+        }>;
+    };
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}/import';
+};
+
+export type PostApiCoachProgramsByProgramIdImportErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * El programa no existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachProgramsByProgramIdImportError = PostApiCoachProgramsByProgramIdImportErrors[keyof PostApiCoachProgramsByProgramIdImportErrors];
+
+export type PostApiCoachProgramsByProgramIdImportResponses = {
+    /**
+     * Importado
+     */
+    200: ImportResponse;
+};
+
+export type PostApiCoachProgramsByProgramIdImportResponse = PostApiCoachProgramsByProgramIdImportResponses[keyof PostApiCoachProgramsByProgramIdImportResponses];
 
 export type GetApiCatalogExercisesData = {
     body?: never;
