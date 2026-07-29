@@ -33,6 +33,7 @@ export default defineNuxtConfig({
         'lucide:clipboard-list',
         'lucide:copy',
         'lucide:dumbbell',
+        'lucide:history',
         'lucide:layout-grid',
         'lucide:list',
         'lucide:loader-circle',
