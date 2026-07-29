@@ -315,8 +315,10 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 - [x] **F0 — Setup**: monorepo pnpm, proyecto Supabase, schema completo con RLS, tipos generados, Hono con OpenAPI montado en Nitro, Nuxt SSR, funciones puras de dominio con tests, deploy a Vercel. → `docs/IMPLEMENTATION-F0.md`
 - [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
 - [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 4 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import de las planillas reales del club**. → `docs/IMPLEMENTATION-F2.md`
-- [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
+- [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), **cambiar su propia contraseña**, Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
+  > El cambio de contraseña propia no necesita ruta ni secret key: lo hace `supabase.auth.updateUser` desde el cliente, re-autenticando primero. Diseño y código en `docs/IMPLEMENTATION-F2.md` §5.5 A.
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; keepalive de UptimeRobot; dominio propio si se quiere.
+  > **Decisión pendiente:** cómo recupera la contraseña un jugador que se la olvidó. Resetear la de OTRO usuario exige la `service_role`, que §4 prohíbe en un request, así que no es "agregar un botón": las tres opciones y sus riesgos están en `docs/IMPLEMENTATION-F2.md` §5.5 B. Hoy el camino es `pnpm set:password`.
 
 ---
 

@@ -281,14 +281,81 @@ pasa ninguna. Sirve para el caso real del club, donde el coach está con el juga
 plan free es de unos pocos mails por hora y está pensado para desarrollo, no para producción. Con la
 confirmación de email apagada (decisión de F1) tampoco hay dirección verificada.
 
-Opciones para F4, todas compatibles con el $0 de `CLAUDE.md` §1:
+### PENDIENTE DE IMPLEMENTAR — botón de cambiar contraseña
 
-1. **Un botón "resetear contraseña" en el panel del coach** que llame a una RPC o ruta con el mismo
-   efecto que el script. Cero servicios nuevos, y calza con el flujo presencial del club. Es lo más
-   barato y probablemente lo correcto.
-2. **SMTP propio gratuito** (Brevo da 300 mails/día sin tarjeta; Resend 3.000/mes) enganchado a
-   Supabase Auth, y usar el flujo de recuperación estándar. Suma un servicio y hay que verificar que
-   no cobre al crecer — evaluarlo contra §2 antes.
+Son **dos features distintas**, y conviene no confundirlas porque su perfil de seguridad no se parece
+en nada. La primera es fácil y va en F3; la segunda choca con una regla de `CLAUDE.md` §4 y hay que
+decidirla explícitamente.
+
+#### A. El usuario cambia su propia contraseña — F3, fácil
+
+Va en la pantalla de perfil del jugador (y sirve igual para el coach). **No necesita la secret key ni
+una ruta nueva**: Supabase Auth deja que una sesión válida cambie su propia contraseña, así que se
+hace desde el cliente igual que el login (decisión #1 de F1: la web es dueña del ciclo de vida de la
+sesión).
+
+```ts
+// En useAuth: al lado de login/register/logout.
+async function changePassword(current: string, next: string): Promise<void> {
+  // Supabase no pide la contraseña actual en updateUser, así que se re-autentica
+  // primero. Sin esto, cualquiera con acceso al dispositivo desbloqueado le
+  // cambia la contraseña a la cuenta.
+  const { error: reauth } = await $supabase.auth.signInWithPassword({
+    email: user.value!.email,
+    password: current,
+  })
+  if (reauth) throw new Error('La contraseña actual no es correcta')
+
+  const { error } = await $supabase.auth.updateUser({ password: next })
+  if (error) {
+    throw new Error(
+      /at least|length/i.test(error.message)
+        ? 'La nueva contraseña tiene que tener al menos 8 caracteres'
+        : 'No se pudo cambiar la contraseña',
+    )
+  }
+}
+```
+
+Lo que hay que hacer, además del composable:
+
+1. Un `changePasswordSchema` en `packages/core/src/validators/auth.ts`: contraseña actual, nueva
+   (mínimo 8, reusando la regla de `registerSchema`) y confirmación, con un `superRefine` que exija
+   que las dos nuevas coincidan y que la nueva sea distinta de la actual.
+2. Un `UForm` en la pantalla de perfil con los tres campos y un toast de confirmación.
+3. Un check en `verify-setup.mjs`: con la contraseña actual correcta funciona; con la incorrecta falla
+   y **la contraseña no cambia** (mirar el dato, no el error — `signInWithPassword` con la vieja tiene
+   que seguir andando).
+
+**Ojo con el re-login:** `signInWithPassword` emite una sesión nueva, así que el flujo pisa la cookie
+actual. Hay que confirmar en el click-through que después de cambiarla el usuario sigue logueado y no
+lo escupe a `/login`.
+
+#### B. El coach le resetea la contraseña a un jugador — F4, hay que decidir antes
+
+Este es el caso de "se la olvidó y estamos en el gimnasio", y **no se puede implementar como una ruta
+normal**: cambiar la contraseña de OTRO usuario exige el admin API de Supabase, que va con la
+`service_role` key — y `CLAUDE.md` §4 dice que ninguna operación de usuario la usa, nunca. No es una
+regla que se pueda saltear de costado: es la que hace que RLS valga algo.
+
+Tampoco alcanza una RPC `security definer`: las contraseñas viven en `auth.users`, que PostgREST no
+expone, y hashearlas desde SQL implicaría replicar lo que hace GoTrue.
+
+Tres caminos, en orden de lo que me parece más sano:
+
+1. **Dejarlo como script** (`pnpm set:password`, ya existe). Cero riesgo, cero servicios nuevos. El
+   costo es que solo lo puede hacer quien tenga la secret key y una terminal — que hoy es una sola
+   persona, y para un club puede alcanzar perfectamente.
+2. **Una excepción explícita y angosta a §4**: una única ruta `POST /admin/players/:id/reset-password`,
+   solo para ADMIN, que use la `service_role` para esa llamada y nada más. Si se toma este camino hay
+   que **actualizar `CLAUDE.md` §4 en el mismo PR** documentando la excepción y por qué, agregar la
+   secret key a las variables de Vercel (hoy no está, a propósito), y auditar la ruta aparte. El
+   riesgo real: la key pasa a estar disponible en el runtime de producción, y a partir de ahí cualquier
+   bug de código puede alcanzarla. **No hacerlo sin pensarlo dos veces.**
+3. **SMTP propio gratuito** (Brevo da 300 mails/día sin tarjeta; Resend 3.000/mes) enganchado a
+   Supabase Auth, y usar el flujo de recuperación estándar sin escribir código de contraseñas. Suma un
+   servicio, así que hay que verificar contra §2 que no cobre al crecer hasta ~300 usuarios. Es el
+   camino que menos código propio de seguridad tiene, que es un punto a favor grande.
 
 Mientras no se decida, el camino es el script.
 
