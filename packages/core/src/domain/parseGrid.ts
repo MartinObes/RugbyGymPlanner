@@ -98,6 +98,7 @@ export function parseGrid(rows: Cell[][]): ParsedProgram {
       loadType: 'NONE',
       weight: null,
       percentage: null,
+      loadLabel: null,
       targetRpe: null,
     }
 

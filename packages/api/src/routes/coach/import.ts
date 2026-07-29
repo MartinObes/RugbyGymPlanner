@@ -162,6 +162,7 @@ export const programImport = new OpenAPIHono<{ Variables: AuthVariables }>().ope
               load_type: exercise.loadType,
               weight: exercise.loadType === 'WEIGHT' ? exercise.weight : null,
               percentage: exercise.loadType === 'PERCENTAGE' ? exercise.percentage : null,
+              load_label: exercise.loadType === 'LABEL' ? exercise.loadLabel : null,
               sets: exercise.sets,
               reps: exercise.reps,
               target_rpe: exercise.targetRpe,

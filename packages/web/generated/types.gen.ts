@@ -89,9 +89,10 @@ export type TreeExercise = {
     id: string;
     exerciseId: string;
     exerciseName: string;
-    loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+    loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL';
     weight: number | null;
     percentage: number | null;
+    loadLabel: string | null;
     sets: number | null;
     reps: string | null;
     targetRpe: number | null;
@@ -1012,9 +1013,10 @@ export type PostApiCoachBlocksByBlockIdExercisesData = {
         exerciseId: string;
         sets: number;
         reps: string;
-        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL';
         weight?: number | null;
         percentage?: number | null;
+        loadLabel?: string | null;
         targetRpe?: number | null;
     };
     path: {
@@ -1084,9 +1086,10 @@ export type PatchApiCoachBlockExercisesByBlockExerciseIdData = {
         exerciseId: string;
         sets: number;
         reps: string;
-        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL';
         weight?: number | null;
         percentage?: number | null;
+        loadLabel?: string | null;
         targetRpe?: number | null;
     };
     path: {
@@ -1300,9 +1303,10 @@ export type PostApiCoachProgramsByProgramIdImportData = {
                         exerciseName: string;
                         sets: number;
                         reps: string;
-                        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+                        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL';
                         weight: number | null;
                         percentage: number | null;
+                        loadLabel: string | null;
                         targetRpe: number | null;
                     }>;
                 }>;

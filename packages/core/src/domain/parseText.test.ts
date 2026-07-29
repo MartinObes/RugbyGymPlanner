@@ -17,6 +17,7 @@ describe('parseText', () => {
       loadType: 'PERCENTAGE',
       weight: null,
       percentage: 80,
+      loadLabel: null,
       targetRpe: 8,
     })
   })

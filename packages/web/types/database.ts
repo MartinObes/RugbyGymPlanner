@@ -19,6 +19,7 @@ export type Database = {
           block_id: string
           exercise_id: string
           id: string
+          load_label: string | null
           load_type: string
           order_index: number
           percentage: number | null
@@ -31,6 +32,7 @@ export type Database = {
           block_id: string
           exercise_id: string
           id?: string
+          load_label?: string | null
           load_type: string
           order_index?: number
           percentage?: number | null
@@ -43,6 +45,7 @@ export type Database = {
           block_id?: string
           exercise_id?: string
           id?: string
+          load_label?: string | null
           load_type?: string
           order_index?: number
           percentage?: number | null

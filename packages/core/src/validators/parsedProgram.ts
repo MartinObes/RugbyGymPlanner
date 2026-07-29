@@ -19,31 +19,32 @@ export const parsedExerciseSchema = z
     exerciseName: z.string().trim().min(2).max(120),
     sets: z.number().int().min(1).max(20),
     reps: z.string().trim().min(1).max(20),
-    loadType: z.enum(['WEIGHT', 'PERCENTAGE', 'NONE']),
+    loadType: z.enum(['WEIGHT', 'PERCENTAGE', 'NONE', 'LABEL']),
     weight: z.number().positive().max(500).nullable(),
     percentage: z.number().int().min(1).max(100).nullable(),
+    /** `p.corp`, `barra`, `m.band`, `60 . 120`: carga que no es un número. */
+    loadLabel: z.string().trim().min(1).max(24).nullable(),
     targetRpe: z.number().min(1).max(10).nullable(),
   })
   .superRefine((data, ctx) => {
-    const custom = z.ZodIssueCode.custom
-    const needs = (field: 'weight' | 'percentage', value: number | null) => {
-      if (value == null) ctx.addIssue({ code: custom, path: [field], message: `Falta ${field}` })
+    // Espejo del CHECK block_exercises_load_shape (0013): cada modo exige su
+    // columna y prohíbe las de los otros tres.
+    const EXPECTED: Record<typeof data.loadType, 'weight' | 'percentage' | 'loadLabel' | null> = {
+      WEIGHT: 'weight',
+      PERCENTAGE: 'percentage',
+      LABEL: 'loadLabel',
+      NONE: null,
     }
-    const forbids = (field: 'weight' | 'percentage', value: number | null) => {
-      if (value != null) ctx.addIssue({ code: custom, path: [field], message: `No lleva ${field}` })
-    }
+    const expected = EXPECTED[data.loadType]
 
-    if (data.loadType === 'WEIGHT') {
-      needs('weight', data.weight)
-      forbids('percentage', data.percentage)
-    }
-    if (data.loadType === 'PERCENTAGE') {
-      needs('percentage', data.percentage)
-      forbids('weight', data.weight)
-    }
-    if (data.loadType === 'NONE') {
-      forbids('weight', data.weight)
-      forbids('percentage', data.percentage)
+    for (const field of ['weight', 'percentage', 'loadLabel'] as const) {
+      const value = data[field]
+      if (field === expected && value == null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `Falta ${field}` })
+      }
+      if (field !== expected && value != null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `No lleva ${field}` })
+      }
     }
   })
 

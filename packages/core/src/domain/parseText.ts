@@ -113,6 +113,9 @@ export function parseText(input: string): ParsedProgram {
       loadType: 'NONE',
       weight: null,
       percentage: null,
+      // El formato de texto no expresa cargas con etiqueta: eso viene de las
+      // planillas del club y lo maneja parseCoachSheet.
+      loadLabel: null,
       targetRpe: null,
     }
 

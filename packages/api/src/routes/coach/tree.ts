@@ -332,16 +332,22 @@ tree.openapi(
 
 // --- ejercicios del bloque ---------------------------------------------------
 
-/** Las columnas de carga: los tres modos son mutuamente excluyentes. */
+/**
+ * Las columnas de carga: los cuatro modos son mutuamente excluyentes y el CHECK
+ * block_exercises_load_shape (0013) lo garantiza. Se limpian las tres que no
+ * corresponden, así el cliente no puede dejar residuo de un modo anterior.
+ */
 function loadColumns(input: {
-  loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE'
+  loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL'
   weight?: number | null
   percentage?: number | null
+  loadLabel?: string | null
 }) {
   return {
     load_type: input.loadType,
     weight: input.loadType === 'WEIGHT' ? input.weight : null,
     percentage: input.loadType === 'PERCENTAGE' ? input.percentage : null,
+    load_label: input.loadType === 'LABEL' ? input.loadLabel : null,
   }
 }
 

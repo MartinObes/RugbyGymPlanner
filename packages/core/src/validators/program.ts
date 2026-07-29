@@ -45,36 +45,40 @@ export const blockExerciseSchema = z
     exerciseId: z.string().uuid('Elegí un ejercicio'),
     sets: z.number().int().min(1, 'Mínimo 1 serie').max(20),
     reps: z.string().trim().min(1, 'Poné las repeticiones').max(20),
-    loadType: z.enum(['WEIGHT', 'PERCENTAGE', 'NONE']),
+    loadType: z.enum(['WEIGHT', 'PERCENTAGE', 'NONE', 'LABEL']),
     weight: z.number().positive('El peso tiene que ser mayor a 0').max(500).nullish(),
     percentage: z.number().int().min(1).max(100).nullish(),
+    /** Carga que no es un número: "p.corp", "barra", "m.band", "60 . 120". */
+    loadLabel: z.string().trim().min(1, 'Poné la etiqueta').max(24).nullish(),
     targetRpe: z.number().min(1).max(10).nullish(),
   })
   .superRefine((data, ctx) => {
     const custom = z.ZodIssueCode.custom
 
-    if (data.loadType === 'WEIGHT') {
-      if (data.weight == null) ctx.addIssue({ code: custom, path: ['weight'], message: 'Poné los kg' })
-      if (data.percentage != null) {
-        ctx.addIssue({ code: custom, path: ['percentage'], message: 'No lleva porcentaje' })
-      }
-    }
+    // Espejo del CHECK block_exercises_load_shape (0013). Los mensajes son los
+    // que ve el coach en el editor, así que van redactados, no genéricos.
+    const RULES = {
+      WEIGHT: { needs: 'weight', message: 'Poné los kg' },
+      PERCENTAGE: { needs: 'percentage', message: 'Poné el porcentaje' },
+      LABEL: { needs: 'loadLabel', message: 'Poné con qué se hace (ej. peso corporal)' },
+      NONE: { needs: null, message: '' },
+    } as const
 
-    if (data.loadType === 'PERCENTAGE') {
-      if (data.percentage == null) {
-        ctx.addIssue({ code: custom, path: ['percentage'], message: 'Poné el porcentaje' })
-      }
-      if (data.weight != null) {
-        ctx.addIssue({ code: custom, path: ['weight'], message: 'No lleva kg fijos' })
-      }
-    }
+    const FORBIDDEN_MESSAGE = {
+      weight: 'Este modo no lleva kg',
+      percentage: 'Este modo no lleva porcentaje',
+      loadLabel: 'Este modo no lleva etiqueta',
+    } as const
 
-    if (data.loadType === 'NONE') {
-      if (data.weight != null) {
-        ctx.addIssue({ code: custom, path: ['weight'], message: 'Sin peso no lleva kg' })
+    const rule = RULES[data.loadType]
+
+    for (const field of ['weight', 'percentage', 'loadLabel'] as const) {
+      const value = data[field]
+      if (field === rule.needs && value == null) {
+        ctx.addIssue({ code: custom, path: [field], message: rule.message })
       }
-      if (data.percentage != null) {
-        ctx.addIssue({ code: custom, path: ['percentage'], message: 'Sin peso no lleva porcentaje' })
+      if (field !== rule.needs && value != null) {
+        ctx.addIssue({ code: custom, path: [field], message: FORBIDDEN_MESSAGE[field] })
       }
     }
   })

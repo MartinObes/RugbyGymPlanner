@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import type { LoadType } from '@coachlab/core/domain/calcLoad'
 import type { ExerciseOption } from '../ExerciseTypeahead.vue'
+
+/**
+ * LABEL es el cuarto modo de carga (migración 0013): una etiqueta corta para lo
+ * que no es un número ni un porcentaje — "p.corp", "barra", "goma", "med 9".
+ * Sale de las planillas reales del club.
+ */
+type RowLoadType = 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL'
 
 export type ExerciseRowValue = {
   id: string
   exerciseId: string
-  loadType: LoadType
+  loadType: RowLoadType
   weight: number | null
   percentage: number | null
+  loadLabel: string | null
   sets: number | null
   reps: string | null
   targetRpe: number | null
@@ -26,6 +33,7 @@ const { trigger, state, error } = useDebouncedSave(async () => {
     loadType: row.loadType,
     weight: row.loadType === 'WEIGHT' ? row.weight : null,
     percentage: row.loadType === 'PERCENTAGE' ? row.percentage : null,
+    loadLabel: row.loadType === 'LABEL' ? row.loadLabel : null,
     sets: row.sets,
     reps: row.reps,
     targetRpe: row.targetRpe,
@@ -35,18 +43,20 @@ const { trigger, state, error } = useDebouncedSave(async () => {
 const LOAD_ITEMS = [
   { label: 'Kg', value: 'WEIGHT' },
   { label: '% del 1RM', value: 'PERCENTAGE' },
+  { label: 'Etiqueta', value: 'LABEL' },
   { label: 'Sin peso', value: 'NONE' },
 ]
 
 /**
- * Al cambiar de modo hay que limpiar el campo del modo anterior ANTES de
- * guardar: si no, el CHECK block_exercises_load_shape rechaza el update y el
- * autosave falla en silencio.
+ * Al cambiar de modo hay que limpiar los campos de los otros ANTES de guardar:
+ * si no, el CHECK block_exercises_load_shape rechaza el update y el autosave
+ * falla en silencio.
  */
 function onLoadTypeChange(next: unknown) {
-  row.loadType = next as LoadType
+  row.loadType = next as RowLoadType
   row.weight = null
   row.percentage = null
+  row.loadLabel = null
   trigger(undefined)
 }
 </script>
@@ -117,6 +127,16 @@ function onLoadTypeChange(next: unknown) {
       class="w-20"
       placeholder="%"
       aria-label="Porcentaje del 1RM"
+      @blur="trigger(undefined)"
+    />
+
+    <UInput
+      v-else-if="row.loadType === 'LABEL'"
+      v-model="row.loadLabel"
+      maxlength="24"
+      class="w-28"
+      placeholder="p.corp"
+      aria-label="Con qué se hace"
       @blur="trigger(undefined)"
     />
 

@@ -34,6 +34,7 @@ describe('importRequestSchema', () => {
     loadType: 'NONE' as const,
     weight: null,
     percentage: null,
+    loadLabel: null,
     targetRpe: null,
   }
   const wrap = (blocks: unknown[]) => ({
@@ -64,6 +65,33 @@ describe('importRequestSchema', () => {
     expect(
       importRequestSchema.safeParse(
         wrap([{ type: 'SINGLE', rounds: null, exercises: [{ ...exercise, loadType: 'WEIGHT' }] }]),
+      ).success,
+    ).toBe(false)
+  })
+
+  it('acepta LABEL con etiqueta y la exige', () => {
+    const label = { ...exercise, loadType: 'LABEL' as const }
+    expect(
+      importRequestSchema.safeParse(
+        wrap([{ type: 'SINGLE', rounds: null, exercises: [{ ...label, loadLabel: 'p.corp' }] }]),
+      ).success,
+    ).toBe(true)
+    expect(
+      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', rounds: null, exercises: [label] }]))
+        .success,
+    ).toBe(false)
+  })
+
+  it('rechaza LABEL con kg al mismo tiempo', () => {
+    expect(
+      importRequestSchema.safeParse(
+        wrap([
+          {
+            type: 'SINGLE',
+            rounds: null,
+            exercises: [{ ...exercise, loadType: 'LABEL', loadLabel: 'p.corp', weight: 100 }],
+          },
+        ]),
       ).success,
     ).toBe(false)
   })
