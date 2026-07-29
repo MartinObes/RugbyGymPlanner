@@ -77,11 +77,35 @@ packages/web/app/pages/admin/index.vue          # contadores
 La página de humo de F0 (`pages/index.vue`) se reemplazó: `/` ahora solo redirige por rol.
 El sidebar linkea **solo páginas que existen** (Grupos/Programas se suman en F2, Mi perfil en F3).
 
-## 4. Auditoría RBAC — hallazgos a resolver ANTES de F2
+## 4. Auditoría RBAC — hallazgos (✅ RESUELTOS el 2026-07-28 por las migraciones `0005`–`0007`)
+
+> **Segunda pasada.** La re-auditoría de `0005` confirmó los 4 cierres pero encontró 3 cosas más,
+> corregidas en `0006` y `0007` (verificado en vivo: **45/45**):
+>
+> | Sev | Qué | Resuelto en |
+> |---|---|---|
+> | MED | La desvinculación por el coach que `0005` documentaba era **código muerto**: RLS la rechaza antes del trigger (ver §6.6) | `0007`: RPC `release_player` |
+> | LOW | Los destinos de un assignment (`player_id`, `position_group_id`) podían ser de otro coach — inerte para lectura tras `0005`, pero un invariante que F2 iba a asumir | `0006`: trigger `guard_assignment_targets` |
+> | LOW | `redeem_invite_code` expuesta a `anon` sin necesidad | `0006`, **corregido de verdad en `0009`** (ver abajo) |
+>
+> **Tercera pasada.** La auditoría de `0006`/`0007` encontró dos cosas más, cerradas en `0009` y
+> `0010` (verificado en vivo: **55/55**):
+>
+> | Sev | Qué | Resuelto en |
+> |---|---|---|
+> | MED | **`revoke ... from anon` no revocaba nada**: Postgres otorga EXECUTE a `PUBLIC` al crear la función, y el chequeo de privilegios cae ahí. `0005` lo había hecho bien (`from public, anon`); `0006`–`0008` copiaron la forma incompleta | `0009`: `revoke from public, anon` + `grant to authenticated` explícito |
+> | MED | Un assignment sobrevivía a la desvinculación del jugador y quedaba apuntando al plantel de otro coach — y encima **inmodificable**, porque el trigger de destinos corría también al editar solo la prioridad | `0009`: `release_player` limpia los assignments directos + trigger acotado a `update of` los destinos |
+> | LOW | El trigger distinguía "programa inexistente" de "programa ajeno" por el mensaje | `0009`: un solo mensaje, autorización primero |
+> | LOW | `release_player` no servía para ADMIN | `0009`: `or public.is_admin()` |
+> | — | `release_player` tiraba `column reference "player_id" is ambiguous` al agregar el `DELETE`: el parámetro se llama igual que la columna de `program_assignments` | `0010`: variable local |
+
 
 `rbac-auditor` dio **APTO PARA MERGE** para el changeset de F1 (las 5 capas verificadas, 0
-críticos). Pero encontró deuda real en las migraciones de F0, hoy latente y explotable recién
-cuando F2/F3 creen assignments y posiciones. **Va una migración nueva antes de cerrar F2:**
+críticos). Pero encontró deuda real en las migraciones de F0, latente y explotable recién
+cuando F2/F3 crearan assignments y posiciones. **Los 4 se corrigieron con la migración 0005**
+(plan: `docs/superpowers/plans/2026-07-28-rbac-hardening.md`), verificada en vivo con
+`pnpm verify:setup` → **30/30** (los 20 checks previos + 10 nuevos que prueban cada fix con
+usuarios y sesiones reales). La tabla queda como registro:
 
 | Sev | Qué | Dónde | Fix mínimo |
 |---|---|---|---|
@@ -163,7 +187,38 @@ solo un warning (`NUXT_E4007`) en la consola del server. Lo encontró el dueño 
 presentación. El smoke test ahora verifica que el HTML del shell incluya "Salir"/"Plantel" y el
 del layout auth su tagline.
 
-**5. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
+**5. Un `UPDATE` que saca la fila del alcance de su política de `SELECT` falla con 42501.** Es lo
+que rompió el primer intento de desvincular un jugador. Postgres exige que la fila **resultante**
+siga siendo visible bajo las políticas de `SELECT`: al poner `coach_id = null`, el jugador deja de
+ser "mi jugador" para `profiles_select` y el coach que está editando ya no puede verla → `42501
+new row violates row-level security policy`, **aunque el `WITH CHECK` pase y sin `RETURNING`**.
+
+Costó porque el mensaje culpa al `WITH CHECK`, que era correcto. Lo que lo aisló fue un
+experimento reversible: dentro de una transacción, ampliar `profiles_select`, correr el update y
+hacer `rollback` — pasó, y ahí quedó claro quién era. Ampliarla de verdad habría expuesto el
+perfil de todo jugador sin coach a cualquier autenticado, así que la operación se movió a la RPC
+`release_player` (`0007`). Está anotado en `CLAUDE.md` §3 porque va a volver: cualquier update que
+cambie la columna por la que scopea una política tiene el mismo problema.
+
+**6. Un `UPDATE` de PostgREST que no matchea filas devuelve ÉXITO.** Un check del verify daba
+"PUDO — agujero" al revés: cuando RLS filtra la fila por `USING`, no hay error, hay 0 filas
+afectadas. Los checks de escritura que esperan un bloqueo por `USING` (no por trigger ni por
+`WITH CHECK`) tienen que **verificar el dato**, no el error.
+
+**7. `revoke execute ... from anon` no revoca nada por sí solo.** Postgres otorga `EXECUTE` a
+`PUBLIC` cuando se crea una función, así que revocar solo a `anon` deja el grant de `PUBLIC` en pie
+y el chequeo de privilegios cae ahí. Hay que escribir `from public, anon` (y un
+`grant to authenticated` explícito, para no depender del grant implícito que se está quitando).
+Se distingue por el error: si la función **corrió** y cortó ella misma (`P0001 No autenticado`),
+sigue alcanzable; si está revocada de verdad, es `42501 permission denied for function`.
+
+**8. Un cliente de supabase-js que hizo `signUp` queda autenticado.** Con la confirmación de email
+apagada, `signUp` devuelve sesión y supabase-js la guarda **en esa instancia**. Reutilizar ese
+cliente como si fuera anónimo hizo que los checks del punto 7 midieran a un usuario autenticado y
+dieran falso negativo — y de paso metieran un ejercicio de prueba en el catálogo global. Para probar
+lo que puede hacer `anon`, el cliente tiene que ser **nuevo y nunca autenticado**.
+
+**9. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
 el formato que el CLI actual lee (espera `.temp/project-ref` o `--db-url`), y no hay login
 guardado (`projects list` → `LegacyPlatformAuthRequiredError`). No es un bug del repo: las
 credenciales de F0 pasaron por el chat y se rotaron a propósito (`IMPLEMENTATION-F0.md` §6.8).

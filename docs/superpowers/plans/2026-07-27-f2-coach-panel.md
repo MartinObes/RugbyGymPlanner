@@ -1,5 +1,7 @@
 # F2 — Panel del coach Implementation Plan
 
+> **OBSOLETO — reemplazado por `2026-07-28-f2-coach-panel.md`, que ya fue ejecutado (ver `docs/IMPLEMENTATION-F2.md`). Se conserva como registro.**
+
 > ## ⚠ PARCIALMENTE OBSOLETO — cambio de stack del 2026-07-27
 >
 > Este plan se escribió contra **AWS + DynamoDB + ElectroDB + JWT propio**, stack que se

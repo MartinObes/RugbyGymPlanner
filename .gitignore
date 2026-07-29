@@ -17,3 +17,9 @@ supabase/.branches/
 # schema Zod de las rutas. El cliente en packages/web/generated/ SÍ se versiona,
 # para que el repo compile sin tener que regenerarlo.
 packages/web/openapi.json
+
+# Planillas reales del club. Tienen DATOS PERSONALES (la hoja "Grupos" lista
+# apellidos y apodos del plantel), así que no van al repo ni siquiera en una rama.
+# Para tests, los fixtures van anonimizados en packages/core/src/domain/__fixtures__/.
+*.xlsx
+*.xls

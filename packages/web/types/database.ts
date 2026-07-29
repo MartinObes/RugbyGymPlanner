@@ -19,6 +19,7 @@ export type Database = {
           block_id: string
           exercise_id: string
           id: string
+          load_label: string | null
           load_type: string
           order_index: number
           percentage: number | null
@@ -31,6 +32,7 @@ export type Database = {
           block_id: string
           exercise_id: string
           id?: string
+          load_label?: string | null
           load_type: string
           order_index?: number
           percentage?: number | null
@@ -43,6 +45,7 @@ export type Database = {
           block_id?: string
           exercise_id?: string
           id?: string
+          load_label?: string | null
           load_type?: string
           order_index?: number
           percentage?: number | null
@@ -74,21 +77,21 @@ export type Database = {
           id: string
           order_index: number
           rounds: number | null
-          type: string | null
+          type: string
         }
         Insert: {
           day_id: string
           id?: string
           order_index?: number
           rounds?: number | null
-          type?: string | null
+          type?: string
         }
         Update: {
           day_id?: string
           id?: string
           order_index?: number
           rounds?: number | null
-          type?: string | null
+          type?: string
         }
         Relationships: [
           {
@@ -557,6 +560,10 @@ export type Database = {
       can_read_program: { Args: { target: string }; Returns: boolean }
       can_write_program: { Args: { target: string }; Returns: boolean }
       coach_name_for_invite: { Args: { code: string }; Returns: string }
+      ensure_exercise: {
+        Args: { p_name: string; p_normalized: string }
+        Returns: string
+      }
       generate_invite_code: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_my_player: { Args: { target: string }; Returns: boolean }
@@ -565,6 +572,8 @@ export type Database = {
       my_system_group_id: { Args: never; Returns: unknown }
       owns_program: { Args: { target: string }; Returns: boolean }
       program_reaches_me: { Args: { target: string }; Returns: boolean }
+      redeem_invite_code: { Args: { code: string }; Returns: undefined }
+      release_player: { Args: { player_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

@@ -5,9 +5,13 @@ const { user, logout } = useAuth()
 
 type NavItem = { to: string; label: string; icon: string }
 
-// Solo páginas que existen: Grupos y Programas se suman en F2, Mi perfil en F3.
+// Solo páginas que existen: Mi perfil se suma en F3.
 const NAV: Record<SessionUser['role'], NavItem[]> = {
-  COACH: [{ to: '/coach/players', label: 'Plantel', icon: 'i-lucide-users' }],
+  COACH: [
+    { to: '/coach/players', label: 'Plantel', icon: 'i-lucide-users' },
+    { to: '/coach/groups', label: 'Grupos', icon: 'i-lucide-layout-grid' },
+    { to: '/coach/programs', label: 'Programas', icon: 'i-lucide-clipboard-list' },
+  ],
   PLAYER: [{ to: '/player/week', label: 'Mi semana', icon: 'i-lucide-calendar-days' }],
   ADMIN: [{ to: '/admin', label: 'Administración', icon: 'i-lucide-shield' }],
 }
