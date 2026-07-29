@@ -86,7 +86,18 @@ El sidebar linkea **solo páginas que existen** (Grupos/Programas se suman en F2
 > |---|---|---|
 > | MED | La desvinculación por el coach que `0005` documentaba era **código muerto**: RLS la rechaza antes del trigger (ver §6.6) | `0007`: RPC `release_player` |
 > | LOW | Los destinos de un assignment (`player_id`, `position_group_id`) podían ser de otro coach — inerte para lectura tras `0005`, pero un invariante que F2 iba a asumir | `0006`: trigger `guard_assignment_targets` |
-> | LOW | `redeem_invite_code` expuesta a `anon` sin necesidad | `0006`: `revoke` |
+> | LOW | `redeem_invite_code` expuesta a `anon` sin necesidad | `0006`, **corregido de verdad en `0009`** (ver abajo) |
+>
+> **Tercera pasada.** La auditoría de `0006`/`0007` encontró dos cosas más, cerradas en `0009` y
+> `0010` (verificado en vivo: **55/55**):
+>
+> | Sev | Qué | Resuelto en |
+> |---|---|---|
+> | MED | **`revoke ... from anon` no revocaba nada**: Postgres otorga EXECUTE a `PUBLIC` al crear la función, y el chequeo de privilegios cae ahí. `0005` lo había hecho bien (`from public, anon`); `0006`–`0008` copiaron la forma incompleta | `0009`: `revoke from public, anon` + `grant to authenticated` explícito |
+> | MED | Un assignment sobrevivía a la desvinculación del jugador y quedaba apuntando al plantel de otro coach — y encima **inmodificable**, porque el trigger de destinos corría también al editar solo la prioridad | `0009`: `release_player` limpia los assignments directos + trigger acotado a `update of` los destinos |
+> | LOW | El trigger distinguía "programa inexistente" de "programa ajeno" por el mensaje | `0009`: un solo mensaje, autorización primero |
+> | LOW | `release_player` no servía para ADMIN | `0009`: `or public.is_admin()` |
+> | — | `release_player` tiraba `column reference "player_id" is ambiguous` al agregar el `DELETE`: el parámetro se llama igual que la columna de `program_assignments` | `0010`: variable local |
 
 
 `rbac-auditor` dio **APTO PARA MERGE** para el changeset de F1 (las 5 capas verificadas, 0
@@ -194,7 +205,20 @@ cambie la columna por la que scopea una política tiene el mismo problema.
 afectadas. Los checks de escritura que esperan un bloqueo por `USING` (no por trigger ni por
 `WITH CHECK`) tienen que **verificar el dato**, no el error.
 
-**7. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
+**7. `revoke execute ... from anon` no revoca nada por sí solo.** Postgres otorga `EXECUTE` a
+`PUBLIC` cuando se crea una función, así que revocar solo a `anon` deja el grant de `PUBLIC` en pie
+y el chequeo de privilegios cae ahí. Hay que escribir `from public, anon` (y un
+`grant to authenticated` explícito, para no depender del grant implícito que se está quitando).
+Se distingue por el error: si la función **corrió** y cortó ella misma (`P0001 No autenticado`),
+sigue alcanzable; si está revocada de verdad, es `42501 permission denied for function`.
+
+**8. Un cliente de supabase-js que hizo `signUp` queda autenticado.** Con la confirmación de email
+apagada, `signUp` devuelve sesión y supabase-js la guarda **en esa instancia**. Reutilizar ese
+cliente como si fuera anónimo hizo que los checks del punto 7 midieran a un usuario autenticado y
+dieran falso negativo — y de paso metieran un ejercicio de prueba en el catálogo global. Para probar
+lo que puede hacer `anon`, el cliente tiene que ser **nuevo y nunca autenticado**.
+
+**9. `supabase db push` no encontró el proyecto pese a `linked-project.json`.** Ese archivo no es
 el formato que el CLI actual lee (espera `.temp/project-ref` o `--db-url`), y no hay login
 guardado (`projects list` → `LegacyPlatformAuthRequiredError`). No es un bug del repo: las
 credenciales de F0 pasaron por el chat y se rotaron a propósito (`IMPLEMENTATION-F0.md` §6.8).

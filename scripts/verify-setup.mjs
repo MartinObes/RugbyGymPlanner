@@ -166,9 +166,38 @@ try {
   const { data: exercisesSeen } = await asPlayer.from('exercises').select('id')
   check('RLS: un usuario autenticado sí ve el catálogo', (exercisesSeen ?? []).length === 24, `ve ${exercisesSeen?.length} ejercicios`)
 
-  // --- 0005: oráculos revocados (L-1) -------------------------------------
-  const { error: genErr } = await anonClient.rpc('generate_invite_code')
-  check('anon no puede invocar generate_invite_code', !!genErr, genErr ? '' : 'PUDO — falta el revoke')
+  // --- 0005/0009: oráculos y RPCs revocados de anon ------------------------
+  //
+  // OJO con la forma del revoke: `revoke ... from anon` NO alcanza, porque el
+  // grant implícito de PUBLIC sobrevive y el chequeo de privilegios cae ahí.
+  // Hace falta `from public, anon`. Se detecta porque el error es P0001 ("No
+  // autenticado", o sea que la función corrió) en vez de 42501.
+  // OJO: cliente NUEVO, no `anonClient`. Ese hizo signUp más arriba y, con la
+  // confirmación de email apagada, signUp DEVUELVE SESIÓN: supabase-js la guarda
+  // en la instancia y el cliente deja de ser anónimo. Reutilizarlo hacía que
+  // estos checks midieran a un usuario autenticado y dieran falsos negativos.
+  const trulyAnon = createClient(URL, ANON, { auth: { persistSession: false } })
+
+  const revokedFromAnon = async (label, fn, args = {}) => {
+    const { error } = await trulyAnon.rpc(fn, args)
+    const denied = /permission denied/i.test(error?.message ?? '')
+    check(label, denied, denied ? '' : `ALCANZABLE -> ${error?.code}: ${error?.message ?? 'sin error'}`)
+  }
+
+  await revokedFromAnon('anon no puede invocar generate_invite_code', 'generate_invite_code')
+  await revokedFromAnon('anon no puede invocar redeem_invite_code', 'redeem_invite_code', { code: 'ZZZZZZ' })
+  await revokedFromAnon('anon no puede invocar release_player', 'release_player', {
+    player_id: '00000000-0000-0000-0000-000000000000',
+  })
+  await revokedFromAnon('anon no puede invocar ensure_exercise', 'ensure_exercise', {
+    p_name: 'Test Anon',
+    p_normalized: 'test anon',
+  })
+
+  // ...pero coach_name_for_invite SÍ tiene que seguir alcanzable: la usa el
+  // formulario de registro antes de que exista la sesión.
+  const { error: nameStillOpen } = await trulyAnon.rpc('coach_name_for_invite', { code: 'ZZZZZZ' })
+  check('coach_name_for_invite sigue disponible para anon (registro)', !nameStillOpen, nameStillOpen?.message ?? '')
 
   const { error: oracleErr } = await asPlayer.rpc('program_reaches_me', {
     target: '00000000-0000-0000-0000-000000000000',
@@ -265,10 +294,54 @@ try {
     foreignGroupTarget?.message?.slice(0, 60) ?? 'PUDO — falta el trigger de 0006',
   )
 
-  const { error: ownPlayerTarget } = await admin
+  const { data: ownAssignment, error: ownPlayerTarget } = await admin
     .from('program_assignments')
     .insert({ program_id: ownProgram.id, player_id: playerId })
+    .select('id')
+    .single()
   check('...pero sí a un jugador del plantel propio', !ownPlayerTarget, ownPlayerTarget?.message ?? '')
+
+  // 0009: el trigger no se evade con UPDATE (declara insert OR update). sneakyId
+  // es un jugador sin coach, así que no está en el plantel de nadie.
+  const { error: repointErr } = await admin
+    .from('program_assignments')
+    .update({ player_id: sneakyId })
+    .eq('id', ownAssignment.id)
+  check(
+    'el trigger tampoco deja repuntar un assignment existente a un destino ajeno',
+    !!repointErr,
+    repointErr?.message?.slice(0, 45) ?? 'PUDO — el UPDATE evade el trigger',
+  )
+
+  // 0009: editar SOLO la prioridad de un assignment no dispara la validación de
+  // destinos. Antes quedaba inmodificable si el destino se había vuelto inválido.
+  const { error: priorityErr } = await admin
+    .from('program_assignments')
+    .update({ priority: 5 })
+    .eq('id', ownAssignment.id)
+  check('se puede editar la prioridad sin revalidar destinos', !priorityErr, priorityErr?.message ?? '')
+
+  // 0009: el trigger también corta desde una sesión de COACH real, no solo con
+  // service_role (que es el camino de las migraciones, no el de producción).
+  const asCoachEarly = createClient(URL, ANON, { auth: { persistSession: false } })
+  await asCoachEarly.auth.signInWithPassword({
+    email: 'coach.test@coachlab.local',
+    password: 'TestPassw0rd!x9',
+  })
+  const { error: coachForeignTarget } = await asCoachEarly
+    .from('program_assignments')
+    .insert({ program_id: ownProgram.id, player_id: sneakyId })
+  check(
+    'con sesión de coach real, un destino fuera del plantel también falla',
+    !!coachForeignTarget,
+    coachForeignTarget?.message?.slice(0, 45) ?? 'PUDO — agujero',
+  )
+
+  // 0009: un PLAYER no puede desvincular a nadie, ni a sí mismo ni a un compañero.
+  const { error: playerRelease } = await asPlayer.rpc('release_player', { player_id: playerId })
+  check('un jugador no puede invocar release_player sobre sí mismo', !!playerRelease)
+  const { error: playerReleaseOther } = await asPlayer.rpc('release_player', { player_id: sneakyId })
+  check('un jugador no puede desvincular a un compañero', !!playerReleaseOther)
 
   // --- 0006: desvinculación (M-1 de la re-auditoría) ----------------------
   // Va AL FINAL: deja al jugador sin coach y eso cambia lo que ve por RLS.
@@ -286,9 +359,12 @@ try {
   })
   check('el coach puede iniciar sesión', !coachSignIn, coachSignIn?.message ?? '')
 
-  // Un PATCH directo NO alcanza, ni siquiera para el coach dueño: al poner
-  // coach_id=null la fila deja de ser visible bajo profiles_select y Postgres
-  // tira 42501. Por eso la operación va por RPC (migración 0007).
+  // Un PATCH directo NO alcanza, ni siquiera para el coach dueño; por eso la
+  // operación va por RPC (migración 0007). Lo frenan dos cosas a la vez: el
+  // WITH CHECK de profiles_update (la fila nueva ya no cumple ninguna rama) y,
+  // si se ampliara esa política, la regla de que la fila resultante tiene que
+  // seguir visible bajo profiles_select (CLAUDE.md §3). Este check falla si se
+  // cae cualquiera de las dos.
   const { error: patchUnlink } = await asCoach.from('profiles').update({ coach_id: null }).eq('id', playerId)
   check(
     'ni el coach puede desvincular con un PATCH directo (va por RPC)',
@@ -322,6 +398,19 @@ try {
 
   const { data: unlinked } = await admin.from('profiles').select('coach_id').eq('id', playerId).single()
   check('la desvinculación dejó coach_id en null', unlinked?.coach_id === null, `coach_id=${unlinked?.coach_id}`)
+
+  // 0009: la desvinculación se lleva los assignments directos. Sin esto quedaban
+  // filas apuntando a un jugador que en cuanto canjea otro código pasa a ser de
+  // otro coach — y encima inmodificables por el trigger de destinos.
+  const { data: orphanAssignments } = await admin
+    .from('program_assignments')
+    .select('id')
+    .eq('player_id', playerId)
+  check(
+    'la desvinculación limpió los assignments directos del jugador',
+    (orphanAssignments ?? []).length === 0,
+    `quedaron ${orphanAssignments?.length ?? 0}`,
+  )
 
   const { error: reRelease } = await asCoach.rpc('release_player', { player_id: playerId })
   check('release_player falla si el jugador ya no es del plantel', !!reRelease)
