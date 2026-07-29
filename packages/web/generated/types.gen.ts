@@ -54,6 +54,23 @@ export type OkResponse = {
     ok: true;
 };
 
+export type Group = {
+    id: string;
+    name: string;
+    positionIds: Array<string>;
+    isSystem: boolean;
+};
+
+export type GroupsResponse = {
+    ok: true;
+    groups: Array<Group>;
+};
+
+export type GroupResponse = {
+    ok: true;
+    group: Group;
+};
+
 export type AdminStatsResponse = {
     ok: true;
     stats: {
@@ -295,6 +312,126 @@ export type PostApiCoachPlayersByPlayerIdReleaseResponses = {
 };
 
 export type PostApiCoachPlayersByPlayerIdReleaseResponse = PostApiCoachPlayersByPlayerIdReleaseResponses[keyof PostApiCoachPlayersByPlayerIdReleaseResponses];
+
+export type GetApiCoachGroupsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/groups';
+};
+
+export type GetApiCoachGroupsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiCoachGroupsError = GetApiCoachGroupsErrors[keyof GetApiCoachGroupsErrors];
+
+export type GetApiCoachGroupsResponses = {
+    /**
+     * Grupos
+     */
+    200: GroupsResponse;
+};
+
+export type GetApiCoachGroupsResponse = GetApiCoachGroupsResponses[keyof GetApiCoachGroupsResponses];
+
+export type PostApiCoachGroupsData = {
+    body?: {
+        name: string;
+        positionIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/coach/groups';
+};
+
+export type PostApiCoachGroupsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type PostApiCoachGroupsError = PostApiCoachGroupsErrors[keyof PostApiCoachGroupsErrors];
+
+export type PostApiCoachGroupsResponses = {
+    /**
+     * Creado
+     */
+    200: GroupResponse;
+};
+
+export type PostApiCoachGroupsResponse = PostApiCoachGroupsResponses[keyof PostApiCoachGroupsResponses];
+
+export type DeleteApiCoachGroupsByGroupIdData = {
+    body?: never;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/coach/groups/{groupId}';
+};
+
+export type DeleteApiCoachGroupsByGroupIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachGroupsByGroupIdError = DeleteApiCoachGroupsByGroupIdErrors[keyof DeleteApiCoachGroupsByGroupIdErrors];
+
+export type DeleteApiCoachGroupsByGroupIdResponses = {
+    /**
+     * Borrado
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachGroupsByGroupIdResponse = DeleteApiCoachGroupsByGroupIdResponses[keyof DeleteApiCoachGroupsByGroupIdResponses];
+
+export type PatchApiCoachGroupsByGroupIdData = {
+    body?: {
+        name: string;
+        positionIds: Array<string>;
+    };
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/coach/groups/{groupId}';
+};
+
+export type PatchApiCoachGroupsByGroupIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachGroupsByGroupIdError = PatchApiCoachGroupsByGroupIdErrors[keyof PatchApiCoachGroupsByGroupIdErrors];
+
+export type PatchApiCoachGroupsByGroupIdResponses = {
+    /**
+     * Actualizado
+     */
+    200: GroupResponse;
+};
+
+export type PatchApiCoachGroupsByGroupIdResponse = PatchApiCoachGroupsByGroupIdResponses[keyof PatchApiCoachGroupsByGroupIdResponses];
 
 export type GetApiAdminStatsData = {
     body?: never;

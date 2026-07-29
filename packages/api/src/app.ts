@@ -3,6 +3,7 @@ import { requireRole, withActor, type AuthVariables } from './middleware/auth'
 import { onError } from './middleware/error'
 import { admin } from './routes/admin'
 import { auth } from './routes/auth'
+import { groups } from './routes/coach/groups'
 import { players } from './routes/coach/players'
 import { health } from './routes/health'
 
@@ -31,6 +32,7 @@ app.use('/admin/*', requireRole(['ADMIN']))
 app.route('/', health)
 app.route('/', auth)
 app.route('/', players)
+app.route('/', groups)
 app.route('/', admin)
 
 app.notFound((c) => c.json({ ok: false as const, error: 'No encontrado' }, 404))
