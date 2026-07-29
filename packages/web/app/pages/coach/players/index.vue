@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { CoachPlayersResponse } from '~~/generated'
+import { positionById } from '@coachlab/core/domain/positions'
 
 const { user } = useAuth()
+const api = useCoachApi()
+const toast = useToast()
 
-// En SSR el fetch interno no arrastra la cookie solo: se reenvía explícita.
-const { data, error } = await useFetch<CoachPlayersResponse>('/api/coach/players', {
-  headers: useRequestHeaders(['cookie']),
-})
+const { data, error, refresh } = await useAsyncData('coach-players', () =>
+  api.get<CoachPlayersResponse>('/api/coach/players'),
+)
 
 const copied = ref(false)
 async function copyCode() {
@@ -15,6 +17,38 @@ async function copyCode() {
   copied.value = true
   setTimeout(() => (copied.value = false), 2000)
 }
+
+const releasing = ref<string | null>(null)
+const confirming = ref<{ id: string; name: string } | null>(null)
+
+// UModal espera un boolean en v-model:open; el objeto guarda a quién se saca.
+const confirmOpen = computed({
+  get: () => confirming.value !== null,
+  set: (value: boolean) => {
+    if (!value) confirming.value = null
+  },
+})
+
+async function release() {
+  if (!confirming.value) return
+  releasing.value = confirming.value.id
+  try {
+    await api.post(`/api/coach/players/${confirming.value.id}/release`)
+    toast.add({ title: `${confirming.value.name} salió del plantel`, color: 'success' })
+    confirming.value = null
+    await refresh()
+  } catch (e) {
+    toast.add({
+      title: 'No se pudo sacar del plantel',
+      description: e instanceof Error ? e.message : undefined,
+      color: 'error',
+    })
+  } finally {
+    releasing.value = null
+  }
+}
+
+const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id) : 'Sin puesto')
 </script>
 
 <template>
@@ -58,14 +92,44 @@ async function copyCode() {
     <UCard v-else-if="data">
       <ul class="divide-y divide-default">
         <li v-for="player in data.players" :key="player.id" class="flex items-center gap-3 py-3">
-          <UIcon name="i-lucide-user" class="size-5 text-muted" />
-          <div class="min-w-0 flex-1">
-            <p class="truncate font-medium">{{ player.name }}</p>
-            <p class="truncate text-sm text-muted">{{ player.email }}</p>
-          </div>
-          <span class="text-sm text-muted">{{ player.positionId ?? 'Sin puesto' }}</span>
+          <NuxtLink :to="`/coach/players/${player.id}`" class="flex min-w-0 flex-1 items-center gap-3">
+            <UIcon name="i-lucide-user" class="size-5 shrink-0 text-muted" />
+            <div class="min-w-0">
+              <p class="truncate font-medium">{{ player.name }}</p>
+              <p class="truncate text-sm text-muted">{{ player.email }}</p>
+            </div>
+          </NuxtLink>
+
+          <span class="hidden text-sm text-muted sm:block">{{ positionName(player.positionId) }}</span>
+
+          <UButton
+            icon="i-lucide-user-minus"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :loading="releasing === player.id"
+            aria-label="Sacar del plantel"
+            @click="confirming = { id: player.id, name: player.name }"
+          />
         </li>
       </ul>
     </UCard>
+
+    <UModal v-model:open="confirmOpen" :title="`¿Sacar a ${confirming?.name} del plantel?`">
+      <template #body>
+        <p class="text-sm text-muted">
+          No se borra la cuenta ni su historial: queda sin entrenador y puede volver a entrar con un
+          código de invitación. Sus asignaciones directas a tus programas se van a quitar.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="confirming = null">Cancelar</UButton>
+          <UButton color="error" :loading="releasing !== null" @click="release">
+            Sacar del plantel
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

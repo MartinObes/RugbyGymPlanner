@@ -165,6 +165,18 @@ export type AssignmentPreviewResponse = {
     rows: Array<AssignmentPreviewRow>;
 };
 
+export type Exercise = {
+    id: string;
+    name: string;
+    normalizedName: string;
+    category: string | null;
+};
+
+export type ExercisesResponse = {
+    ok: true;
+    exercises: Array<Exercise>;
+};
+
 export type AdminStatsResponse = {
     ok: true;
     stats: {
@@ -1266,6 +1278,31 @@ export type GetApiCoachAssignmentsPreviewResponses = {
 };
 
 export type GetApiCoachAssignmentsPreviewResponse = GetApiCoachAssignmentsPreviewResponses[keyof GetApiCoachAssignmentsPreviewResponses];
+
+export type GetApiCatalogExercisesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/catalog/exercises';
+};
+
+export type GetApiCatalogExercisesErrors = {
+    /**
+     * Sin sesión
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiCatalogExercisesError = GetApiCatalogExercisesErrors[keyof GetApiCatalogExercisesErrors];
+
+export type GetApiCatalogExercisesResponses = {
+    /**
+     * Catálogo
+     */
+    200: ExercisesResponse;
+};
+
+export type GetApiCatalogExercisesResponse = GetApiCatalogExercisesResponses[keyof GetApiCatalogExercisesResponses];
 
 export type GetApiAdminStatsData = {
     body?: never;

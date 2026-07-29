@@ -3,6 +3,7 @@ import { requireRole, withActor, type AuthVariables } from './middleware/auth'
 import { onError } from './middleware/error'
 import { admin } from './routes/admin'
 import { auth } from './routes/auth'
+import { catalog } from './routes/catalog'
 import { assignments } from './routes/coach/assignments'
 import { groups } from './routes/coach/groups'
 import { players } from './routes/coach/players'
@@ -31,6 +32,10 @@ app.use('*', withActor)
 app.use('/coach/*', requireRole(['COACH', 'ADMIN']))
 app.use('/player/*', requireRole(['PLAYER']))
 app.use('/admin/*', requireRole(['ADMIN']))
+// El catálogo de ejercicios lo leen las dos partes (editor de programas y 1RM
+// del jugador), así que su prefijo admite los tres roles — pero lo admite
+// EXPLÍCITAMENTE, no por ausencia de guard.
+app.use('/catalog/*', requireRole(['PLAYER', 'COACH', 'ADMIN']))
 
 app.route('/', health)
 app.route('/', auth)
@@ -39,6 +44,7 @@ app.route('/', groups)
 app.route('/', programs)
 app.route('/', tree)
 app.route('/', assignments)
+app.route('/', catalog)
 app.route('/', admin)
 
 app.notFound((c) => c.json({ ok: false as const, error: 'No encontrado' }, 404))
