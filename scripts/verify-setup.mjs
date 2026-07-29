@@ -49,8 +49,17 @@ async function makeUser(email, meta) {
 
 try {
   // --- catálogo -----------------------------------------------------------
+  // El catálogo ARRANCA con los 24 del seed y está diseñado para crecer: el
+  // import agrega los que faltan vía ensure_exercise. Por eso el check es "al
+  // menos los del seed", no una igualdad — que se rompía sola en cuanto alguien
+  // importaba una planilla.
+  const SEED_EXERCISES = 24
   const { count } = await admin.from('exercises').select('*', { count: 'exact', head: true })
-  check('catálogo tiene 24 ejercicios', count === 24, `count=${count}`)
+  check(
+    `catálogo tiene al menos los ${SEED_EXERCISES} del seed`,
+    (count ?? 0) >= SEED_EXERCISES,
+    `count=${count}`,
+  )
 
   const { data: sb } = await admin
     .from('exercises')
@@ -165,7 +174,11 @@ try {
   )
 
   const { data: exercisesSeen } = await asPlayer.from('exercises').select('id')
-  check('RLS: un usuario autenticado sí ve el catálogo', (exercisesSeen ?? []).length === 24, `ve ${exercisesSeen?.length} ejercicios`)
+  check(
+    'RLS: un usuario autenticado sí ve el catálogo completo',
+    (exercisesSeen ?? []).length === count,
+    `ve ${exercisesSeen?.length} de ${count}`,
+  )
 
   // --- 0005/0009: oráculos y RPCs revocados de anon ------------------------
   //
@@ -475,6 +488,23 @@ try {
     p_normalized: 'BA',
   })
   check('ensure_exercise rechaza un normalized_name inválido', !!badNormErr)
+
+  // 0014: ...pero la puntuación SÍ pasa. normName no la saca, y los nombres
+  // reales de las planillas la usan constantemente. La primera versión de la
+  // validación tenía una whitelist alfanumérica y rompía el import entero.
+  const REAL_NAMES = [
+    ['Sub. lat al cajon c/pie arriba m.bosu', 'sub. lat al cajon c/pie arriba m.bosu'],
+    ['Acostado: Pecho - Pull overs', 'acostado: pecho - pull overs'],
+    ["Prensa 1p - Pantorrilla (2'')", "prensa 1p - pantorrilla (2'')"],
+  ]
+  for (const [name, normalized] of REAL_NAMES) {
+    const { data: id, error } = await asCoachEarly.rpc('ensure_exercise', {
+      p_name: name,
+      p_normalized: normalized,
+    })
+    check(`ensure_exercise acepta "${name.slice(0, 28)}…"`, !!id && !error, error?.message ?? '')
+    if (id) createdExercises.push(id)
+  }
 
   // ...pero la ñ sí pasa: normName la preserva a propósito.
   const { data: enyeId, error: enyeErr } = await asCoachEarly.rpc('ensure_exercise', {
