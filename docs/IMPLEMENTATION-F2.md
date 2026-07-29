@@ -105,7 +105,55 @@ packages/web/app/
   pages/coach/programs/[programId]/{index,assign,import}.vue
 ```
 
-## 4. Los tres problemas que valen la pena
+## 3.5. El import, validado contra las planillas reales
+
+El 2026-07-29 el dueño del repo aportó dos libros de Excel del preparador físico y el formato que yo
+había asumido resultó **equivocado de raíz**. El parser nuevo es
+`packages/core/src/domain/parseCoachSheet.ts`.
+
+**El formato real:** un archivo es un grupo de puestos (`Ms-Ap-Wi-Fb` = medioscrum, apertura, wing,
+fullback). Una hoja es un bloque de **1 a 3 semanas puestas al lado**, y el nombre de la hoja son los
+números de semana (`14.15.16`, `Fuerza 1.2`, `29.30`).
+
+| Dónde | Qué |
+|---|---|
+| Columna A | marcador de bloque: `bloque 1`, `bloque 2`… |
+| Columna B | nombre del bloque y, debajo, los ejercicios |
+| Col. B, fila 2 | `SESION 1 - LUNES` → el día |
+| Fila de encabezados | `kilos \| repet \| S`, repetido por semana |
+| Grupos de 3 columnas | una semana cada uno |
+
+**Cuatro cosas que obligaron a decidir**, y lo que se decidió (dueño del repo):
+
+1. **Cargas que no son números** (`p.corp`, `barra`, `goma`, `m.band`, `med 9`, `60 . 120`) → cuarto
+   modo de carga `LABEL` con una etiqueta corta (migración `0013`). Mapearlas a `NONE` habría perdido
+   información que el jugador necesita para saber con qué hacer el ejercicio.
+2. **Filas que son dos ejercicios** (`Cuadriceps 1p - 2p` con carga `60 . 120`) → se conservan
+   enteras. Partirlas exige adivinar cuando la cantidad de partes no coincide, y una adivinanza mala
+   cambia la rutina.
+3. **Semanas al lado** → una semana del programa por columna, cada una con sus cargas. Eso preserva
+   la progresión, que es el trabajo del preparador.
+4. **Cero porcentajes del 1RM en las planillas.** El diferencial del producto no se usa hoy en la
+   planificación del club: el import nunca lo va a generar. Es una forma de trabajar que la app
+   habilita, no algo que se pueda importar.
+
+**Dos cosas que el parser tuvo que aprender de los datos reales, no de mis fixtures:**
+
+- **La posición de las columnas varía.** Con columna separadora las semanas arrancan en D; sin
+  separadora, en C. Por eso los grupos se **detectan** leyendo la fila `kilos | repet`, y una hoja sin
+  esa fila no es una rutina — así se saltean solas el calendario de micros, el plantel, las hojas de
+  aeróbico y las vacías.
+- **Los sub-bloques no llevan marcador.** `C 1`, `C 2`, `C 3` dentro de un día no tienen `bloque n` en
+  la columna A: su única señal son las vueltas en la celda de carga. Detectar solo por la columna A
+  hacía que esas filas entraran como **ejercicios con carga "3 VUELTAS"** — lo encontré recién al
+  correr el parser contra los libros reales.
+
+**Resultado sobre los libros reales:** 20 de 28 hojas parsean como rutina y las 8 salteadas son
+exactamente las que no lo son. El import de la hoja `14.15.16` de punta a punta contra la base:
+**14/14 checks** — 3 semanas, 9 días, 108 ejercicios, 30 circuitos con sus vueltas, 35 cargas con
+etiqueta, 73 en kg, 27 ejercicios nuevos al catálogo, y reimportar reemplaza sin duplicar.
+
+## 4. Los problemas que valen la pena
 
 ### 4.1. El fix de la desvinculación era código muerto (y el mensaje de error culpaba al inocente)
 
@@ -157,6 +205,49 @@ nunca llega a PostgREST; el typecheck no ve strings de select; y `verify:setup` 
 directo, sin pasar por las rutas. Lo agarró el smoke test contra el dev server con una sesión real,
 que es el único nivel donde el seam Nuxt → Hono → PostgREST se ejercita completo.
 
+### 4.4. La auditoría encontró un HIGH que sí era explotable
+
+`rbac-auditor` sobre la API de F2 dio "apto para merge" (ninguna ruta sin guard, ningún cross-tenant
+sobre datos de negocio) pero encontró un agujero **fuera** de la API, y lo verifiqué antes de
+arreglarlo:
+
+```
+rol del atacante: PLAYER
+ESCRIBIÓ EL CATÁLOGO -> name="ATAQUE Catalogo Global" normalized_name="ba"
+```
+
+`ensure_exercise` (`0008`) es `security definer` —saltea `exercises_write`, que es ADMIN-only—, tenía
+`grant execute` a `authenticated`, y su único control era `auth.uid() is null`. Como registrarse es
+público, cualquiera pegaba en `POST /rest/v1/rpc/ensure_exercise` con la anon key y su JWT **sin pasar
+por Hono**. La lección: **el borde de seguridad de una RPC es la RPC, no la ruta que la llama**; el
+guard de `/coach/*` no protege nada invocable por PostgREST. Y el `normalized_name` de dos letras del
+ejemplo secuestraría el cálculo de kg de todo ejercicio que las contenga, porque `rmFor` matchea por
+inclusión.
+
+Cerrado en `0012` con un chequeo de rol y validación del parámetro. Pero esa validación se pasó de
+estricta —whitelist alfanumérica— y **rompió el import entero**: `normName` no saca puntuación, y los
+nombres reales están llenos de puntos y barras (`Sub. lat al cajon c/pie arriba m.bosu`). `0014` la
+cambia por lo que corresponde: verificar que el nombre **esté normalizado** (minúsculas, sin espacios
+dobles, sin acentos que `normName` habría sacado) en vez de adivinar su juego de caracteres.
+
+De la misma auditoría salieron dos arreglos más que valen: el import **validaba después de borrar el
+árbol**, así que un `CIRCUIT` sin vueltas vaciaba el programa y devolvía 500 — ahora los schemas del
+import espejan los `CHECK` y tienen topes de tamaño; y el reemplazo de puestos de un grupo hacía
+delete-y-después-insert, así que si el insert fallaba el grupo quedaba **sin puestos** y sus
+assignments dejaban de alcanzar a nadie en silencio.
+
+### 4.5. Los iconos del sidebar no se veían
+
+Nuxt Icon resolvía los iconos en runtime y salía a buscarlos por red: cada uno fallaba con
+`loading icon lucide:users timed out after 1500ms` y quedaba en blanco, aunque `@iconify-json/lucide`
+estuviera instalado. Se arregla inlineándolos en el bundle (`clientBundle` en `nuxt.config.ts`), que
+además evita requests en producción.
+
+La lista es **explícita** y no `scan: true`, porque el nav pasa el icono por binding dinámico
+(`:name="item.icon"`) y el escaneo estático no ve esos nombres. Como una lista desfasada no rompe ni el
+build ni el typecheck —el icono simplemente no se ve— hay un test (`packages/web/tests/icons.test.ts`)
+que compara las dos listas.
+
 ## 5. Hallazgos que se corrigieron sobre la marcha
 
 Dos cosas que habrían bloqueado la fase a mitad de camino y aparecieron al escribir el código:
@@ -178,9 +269,16 @@ coherencia de `LoadType`.
 
 ## 6. Deuda conocida
 
-- **El formato del import es una suposición.** `coach.html` y `README-CoachLab.md` **siguen sin estar
-  en el repo**. El contrato (`ParsedProgram`) y las firmas no van a cambiar, pero el formato de
-  entrada hay que confirmarlo contra el prototipo o con un coach real antes de F4.
+- **El formato del import está validado** (§3.5) contra dos libros reales, pero solo contra esos dos.
+  Si aparece una planilla con otra disposición, el síntoma va a ser una hoja que no se reconoce como
+  rutina (se saltea, no rompe) o ejercicios raros en la previsualización — que es justo para lo que la
+  previsualización está.
+- **`sets` siempre entra como 1.** Las planillas dejan la columna `S` vacía y las vueltas del bloque
+  hacen ese papel, así que el parser no tiene de dónde sacar las series. El coach las ajusta en el
+  editor. Si resulta que `S` se usa en otras hojas, es un cambio de una línea.
+- **Las hojas de aeróbico no se importan.** No tienen la fila `kilos | repet`, así que se saltean. Sus
+  "ejercicios" son instrucciones de corrida (`4 x 40 continuos`, `pausa: 45''`) que el modelo de
+  bloques no representa bien; queda para decidir si entran como texto o quedan afuera del MVP.
 - **El import no es transaccional** (§2.6). Si molesta, va como RPC `import_program(jsonb)`.
 - **Los tipos generados viven en `packages/web/types/database.ts`**, así que el cliente de la API no
   está tipado con `Database` y los selects anidados se infieren como arrays. Se normalizan las dos

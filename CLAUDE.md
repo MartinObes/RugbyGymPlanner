@@ -28,7 +28,9 @@ Este repo es la **tercera encarnación** del producto. Referencias (no se portan
 2. **`NEXTJS_APP_CONTEXT.md`** — análisis del intento anterior (backend .NET 9 + Angular 21, repo WorkoutPlannerApp). De ahí se reutiliza **diseño, no código**: el algoritmo del WorkoutProcessor, el modelo Evaluation, el catálogo de ~48 ejercicios del seeder, y los patrones de UX (form dinámico por LoadType, typeahead de ejercicios).
 3. **Este repo** — la app definitiva: **Nuxt + Hono + Supabase, desplegada en Vercel**.
 
-> ⚠ **Los tres archivos de referencia todavía no están en el repo.** Mientras falten, `spec-navigator` no tiene qué leer, y todo lo que dependa del formato exacto del prototipo (import Excel/texto, catálogo de ejercicios) va marcado como pendiente de validación en vez de inventado.
+> ⚠ **Los tres archivos de referencia todavía no están en el repo.** Mientras falten, `spec-navigator` no tiene qué leer, y todo lo que dependa del formato exacto del prototipo va marcado como pendiente de validación en vez de inventado.
+>
+> **El import ya NO depende de eso** (2026-07-29): el dueño del repo aportó dos libros de Excel reales del preparador físico y el formato quedó validado contra ellos. El parser es `packages/core/src/domain/parseCoachSheet.ts` y su formato está documentado ahí y en `docs/IMPLEMENTATION-F2.md` §4. **Las planillas no van al repo**: tienen datos personales (la hoja "Grupos" lista apellidos y apodos del plantel), y `.gitignore` bloquea `*.xlsx`. Los fixtures de test son calcos anonimizados.
 
 ### Historial de stack — dos definiciones descartadas
 
@@ -165,7 +167,7 @@ where a.player_id = $playerId
       )
 ```
 
-**Cálculo de carga** (el WorkoutProcessor, portado de .NET): si `load_type = 'PERCENTAGE'`, buscar el 1RM del jugador para ese ejercicio (match por `normalized_name`, tolerante a inclusión parcial como en `rmFor` del prototipo) y calcular `round(percentage/100 * kg * 2) / 2` (redondeo a 0.5 kg como el prototipo). Sin 1RM → mostrar el % con aviso "falta tu 1RM de X". `WEIGHT` → kg fijo. `NONE` → sin carga.
+**Cálculo de carga** (el WorkoutProcessor, portado de .NET): si `load_type = 'PERCENTAGE'`, buscar el 1RM del jugador para ese ejercicio (match por `normalized_name`, tolerante a inclusión parcial como en `rmFor` del prototipo) y calcular `round(percentage/100 * kg * 2) / 2` (redondeo a 0.5 kg como el prototipo). Sin 1RM → mostrar el % con aviso "falta tu 1RM de X". `WEIGHT` → kg fijo. `NONE` → sin carga. **`LABEL` → se muestra la etiqueta tal cual** (`p.corp`, `barra`, `goma`, `med 9`): es el cuarto modo, agregado en la migración `0013` porque las planillas reales del club usan cargas que no son ni número ni porcentaje.
 
 **"Última vez" (`lastPerf`)**: último `exercise_entry` del jugador para el mismo ejercicio (por `normalized_name`) en días anteriores, mostrando "Semana X · Día: NN kg · N reps · RPE N". En Postgres es un join con `ORDER BY completed_at DESC LIMIT 1`, no un filtrado en memoria.
 
@@ -312,8 +314,7 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 
 - [x] **F0 — Setup**: monorepo pnpm, proyecto Supabase, schema completo con RLS, tipos generados, Hono con OpenAPI montado en Nitro, Nuxt SSR, funciones puras de dominio con tests, deploy a Vercel. → `docs/IMPLEMENTATION-F0.md`
 - [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
-- [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 3 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import Excel/texto**. → `docs/IMPLEMENTATION-F2.md`
-  > **Pendiente de validación:** el formato de import Excel/texto se implementó sin `coach.html` a la vista. Confirmar contra el prototipo o con un coach real antes de F4.
+- [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 4 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import de las planillas reales del club**. → `docs/IMPLEMENTATION-F2.md`
 - [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; keepalive de UptimeRobot; dominio propio si se quiere.
 
