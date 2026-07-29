@@ -5,6 +5,8 @@ import { admin } from './routes/admin'
 import { auth } from './routes/auth'
 import { groups } from './routes/coach/groups'
 import { players } from './routes/coach/players'
+import { programs } from './routes/coach/programs'
+import { tree } from './routes/coach/tree'
 import { health } from './routes/health'
 
 /**
@@ -33,6 +35,8 @@ app.route('/', health)
 app.route('/', auth)
 app.route('/', players)
 app.route('/', groups)
+app.route('/', programs)
+app.route('/', tree)
 app.route('/', admin)
 
 app.notFound((c) => c.json({ ok: false as const, error: 'No encontrado' }, 404))

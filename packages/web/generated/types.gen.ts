@@ -71,6 +71,72 @@ export type GroupResponse = {
     group: Group;
 };
 
+export type ProgramSummary = {
+    id: string;
+    name: string;
+    currentWeekId: string | null;
+    weekCount: number;
+    assignmentCount: number;
+    updatedAt: string;
+};
+
+export type ProgramsResponse = {
+    ok: true;
+    programs: Array<ProgramSummary>;
+};
+
+export type TreeExercise = {
+    id: string;
+    exerciseId: string;
+    exerciseName: string;
+    loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+    weight: number | null;
+    percentage: number | null;
+    sets: number | null;
+    reps: string | null;
+    targetRpe: number | null;
+    orderIndex: number;
+};
+
+export type TreeBlock = {
+    id: string;
+    type: 'SINGLE' | 'CIRCUIT';
+    rounds: number | null;
+    orderIndex: number;
+    exercises: Array<TreeExercise>;
+};
+
+export type TreeDay = {
+    id: string;
+    name: string;
+    orderIndex: number;
+    blocks: Array<TreeBlock>;
+};
+
+export type TreeWeek = {
+    id: string;
+    name: string;
+    orderIndex: number;
+    days: Array<TreeDay>;
+};
+
+export type ProgramTree = {
+    id: string;
+    name: string;
+    currentWeekId: string | null;
+    weeks: Array<TreeWeek>;
+};
+
+export type ProgramTreeResponse = {
+    ok: true;
+    program: ProgramTree;
+};
+
+export type CreatedRow = {
+    ok: true;
+    id: string;
+};
+
 export type AdminStatsResponse = {
     ok: true;
     stats: {
@@ -432,6 +498,617 @@ export type PatchApiCoachGroupsByGroupIdResponses = {
 };
 
 export type PatchApiCoachGroupsByGroupIdResponse = PatchApiCoachGroupsByGroupIdResponses[keyof PatchApiCoachGroupsByGroupIdResponses];
+
+export type GetApiCoachProgramsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/programs';
+};
+
+export type GetApiCoachProgramsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiCoachProgramsError = GetApiCoachProgramsErrors[keyof GetApiCoachProgramsErrors];
+
+export type GetApiCoachProgramsResponses = {
+    /**
+     * Programas
+     */
+    200: ProgramsResponse;
+};
+
+export type GetApiCoachProgramsResponse = GetApiCoachProgramsResponses[keyof GetApiCoachProgramsResponses];
+
+export type PostApiCoachProgramsData = {
+    body?: {
+        name: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/coach/programs';
+};
+
+export type PostApiCoachProgramsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type PostApiCoachProgramsError = PostApiCoachProgramsErrors[keyof PostApiCoachProgramsErrors];
+
+export type PostApiCoachProgramsResponses = {
+    /**
+     * Creado
+     */
+    200: {
+        ok: true;
+        programId: string;
+    };
+};
+
+export type PostApiCoachProgramsResponse = PostApiCoachProgramsResponses[keyof PostApiCoachProgramsResponses];
+
+export type DeleteApiCoachProgramsByProgramIdData = {
+    body?: never;
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}';
+};
+
+export type DeleteApiCoachProgramsByProgramIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachProgramsByProgramIdError = DeleteApiCoachProgramsByProgramIdErrors[keyof DeleteApiCoachProgramsByProgramIdErrors];
+
+export type DeleteApiCoachProgramsByProgramIdResponses = {
+    /**
+     * Borrado
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachProgramsByProgramIdResponse = DeleteApiCoachProgramsByProgramIdResponses[keyof DeleteApiCoachProgramsByProgramIdResponses];
+
+export type GetApiCoachProgramsByProgramIdData = {
+    body?: never;
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}';
+};
+
+export type GetApiCoachProgramsByProgramIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type GetApiCoachProgramsByProgramIdError = GetApiCoachProgramsByProgramIdErrors[keyof GetApiCoachProgramsByProgramIdErrors];
+
+export type GetApiCoachProgramsByProgramIdResponses = {
+    /**
+     * Árbol
+     */
+    200: ProgramTreeResponse;
+};
+
+export type GetApiCoachProgramsByProgramIdResponse = GetApiCoachProgramsByProgramIdResponses[keyof GetApiCoachProgramsByProgramIdResponses];
+
+export type PatchApiCoachProgramsByProgramIdData = {
+    body?: {
+        name?: string;
+        currentWeekId?: string | null;
+    };
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}';
+};
+
+export type PatchApiCoachProgramsByProgramIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachProgramsByProgramIdError = PatchApiCoachProgramsByProgramIdErrors[keyof PatchApiCoachProgramsByProgramIdErrors];
+
+export type PatchApiCoachProgramsByProgramIdResponses = {
+    /**
+     * Actualizado
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PatchApiCoachProgramsByProgramIdResponse = PatchApiCoachProgramsByProgramIdResponses[keyof PatchApiCoachProgramsByProgramIdResponses];
+
+export type PostApiCoachProgramsByProgramIdWeeksData = {
+    body?: {
+        name: string;
+    };
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}/weeks';
+};
+
+export type PostApiCoachProgramsByProgramIdWeeksErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachProgramsByProgramIdWeeksError = PostApiCoachProgramsByProgramIdWeeksErrors[keyof PostApiCoachProgramsByProgramIdWeeksErrors];
+
+export type PostApiCoachProgramsByProgramIdWeeksResponses = {
+    /**
+     * Creado
+     */
+    200: CreatedRow;
+};
+
+export type PostApiCoachProgramsByProgramIdWeeksResponse = PostApiCoachProgramsByProgramIdWeeksResponses[keyof PostApiCoachProgramsByProgramIdWeeksResponses];
+
+export type DeleteApiCoachWeeksByWeekIdData = {
+    body?: never;
+    path: {
+        weekId: string;
+    };
+    query?: never;
+    url: '/api/coach/weeks/{weekId}';
+};
+
+export type DeleteApiCoachWeeksByWeekIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachWeeksByWeekIdError = DeleteApiCoachWeeksByWeekIdErrors[keyof DeleteApiCoachWeeksByWeekIdErrors];
+
+export type DeleteApiCoachWeeksByWeekIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachWeeksByWeekIdResponse = DeleteApiCoachWeeksByWeekIdResponses[keyof DeleteApiCoachWeeksByWeekIdResponses];
+
+export type PatchApiCoachWeeksByWeekIdData = {
+    body?: {
+        name: string;
+    };
+    path: {
+        weekId: string;
+    };
+    query?: never;
+    url: '/api/coach/weeks/{weekId}';
+};
+
+export type PatchApiCoachWeeksByWeekIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachWeeksByWeekIdError = PatchApiCoachWeeksByWeekIdErrors[keyof PatchApiCoachWeeksByWeekIdErrors];
+
+export type PatchApiCoachWeeksByWeekIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PatchApiCoachWeeksByWeekIdResponse = PatchApiCoachWeeksByWeekIdResponses[keyof PatchApiCoachWeeksByWeekIdResponses];
+
+export type PostApiCoachWeeksByWeekIdDaysData = {
+    body?: {
+        name: string;
+    };
+    path: {
+        weekId: string;
+    };
+    query?: never;
+    url: '/api/coach/weeks/{weekId}/days';
+};
+
+export type PostApiCoachWeeksByWeekIdDaysErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachWeeksByWeekIdDaysError = PostApiCoachWeeksByWeekIdDaysErrors[keyof PostApiCoachWeeksByWeekIdDaysErrors];
+
+export type PostApiCoachWeeksByWeekIdDaysResponses = {
+    /**
+     * Creado
+     */
+    200: CreatedRow;
+};
+
+export type PostApiCoachWeeksByWeekIdDaysResponse = PostApiCoachWeeksByWeekIdDaysResponses[keyof PostApiCoachWeeksByWeekIdDaysResponses];
+
+export type DeleteApiCoachDaysByDayIdData = {
+    body?: never;
+    path: {
+        dayId: string;
+    };
+    query?: never;
+    url: '/api/coach/days/{dayId}';
+};
+
+export type DeleteApiCoachDaysByDayIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachDaysByDayIdError = DeleteApiCoachDaysByDayIdErrors[keyof DeleteApiCoachDaysByDayIdErrors];
+
+export type DeleteApiCoachDaysByDayIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachDaysByDayIdResponse = DeleteApiCoachDaysByDayIdResponses[keyof DeleteApiCoachDaysByDayIdResponses];
+
+export type PatchApiCoachDaysByDayIdData = {
+    body?: {
+        name: string;
+    };
+    path: {
+        dayId: string;
+    };
+    query?: never;
+    url: '/api/coach/days/{dayId}';
+};
+
+export type PatchApiCoachDaysByDayIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachDaysByDayIdError = PatchApiCoachDaysByDayIdErrors[keyof PatchApiCoachDaysByDayIdErrors];
+
+export type PatchApiCoachDaysByDayIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PatchApiCoachDaysByDayIdResponse = PatchApiCoachDaysByDayIdResponses[keyof PatchApiCoachDaysByDayIdResponses];
+
+export type PostApiCoachDaysByDayIdBlocksData = {
+    body?: {
+        type: 'SINGLE' | 'CIRCUIT';
+        rounds?: number | null;
+    };
+    path: {
+        dayId: string;
+    };
+    query?: never;
+    url: '/api/coach/days/{dayId}/blocks';
+};
+
+export type PostApiCoachDaysByDayIdBlocksErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachDaysByDayIdBlocksError = PostApiCoachDaysByDayIdBlocksErrors[keyof PostApiCoachDaysByDayIdBlocksErrors];
+
+export type PostApiCoachDaysByDayIdBlocksResponses = {
+    /**
+     * Creado
+     */
+    200: CreatedRow;
+};
+
+export type PostApiCoachDaysByDayIdBlocksResponse = PostApiCoachDaysByDayIdBlocksResponses[keyof PostApiCoachDaysByDayIdBlocksResponses];
+
+export type DeleteApiCoachBlocksByBlockIdData = {
+    body?: never;
+    path: {
+        blockId: string;
+    };
+    query?: never;
+    url: '/api/coach/blocks/{blockId}';
+};
+
+export type DeleteApiCoachBlocksByBlockIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachBlocksByBlockIdError = DeleteApiCoachBlocksByBlockIdErrors[keyof DeleteApiCoachBlocksByBlockIdErrors];
+
+export type DeleteApiCoachBlocksByBlockIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachBlocksByBlockIdResponse = DeleteApiCoachBlocksByBlockIdResponses[keyof DeleteApiCoachBlocksByBlockIdResponses];
+
+export type PatchApiCoachBlocksByBlockIdData = {
+    body?: {
+        type: 'SINGLE' | 'CIRCUIT';
+        rounds?: number | null;
+    };
+    path: {
+        blockId: string;
+    };
+    query?: never;
+    url: '/api/coach/blocks/{blockId}';
+};
+
+export type PatchApiCoachBlocksByBlockIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachBlocksByBlockIdError = PatchApiCoachBlocksByBlockIdErrors[keyof PatchApiCoachBlocksByBlockIdErrors];
+
+export type PatchApiCoachBlocksByBlockIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PatchApiCoachBlocksByBlockIdResponse = PatchApiCoachBlocksByBlockIdResponses[keyof PatchApiCoachBlocksByBlockIdResponses];
+
+export type PostApiCoachBlocksByBlockIdExercisesData = {
+    body?: {
+        exerciseId: string;
+        sets: number;
+        reps: string;
+        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+        weight?: number | null;
+        percentage?: number | null;
+        targetRpe?: number | null;
+    };
+    path: {
+        blockId: string;
+    };
+    query?: never;
+    url: '/api/coach/blocks/{blockId}/exercises';
+};
+
+export type PostApiCoachBlocksByBlockIdExercisesErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachBlocksByBlockIdExercisesError = PostApiCoachBlocksByBlockIdExercisesErrors[keyof PostApiCoachBlocksByBlockIdExercisesErrors];
+
+export type PostApiCoachBlocksByBlockIdExercisesResponses = {
+    /**
+     * Creado
+     */
+    200: CreatedRow;
+};
+
+export type PostApiCoachBlocksByBlockIdExercisesResponse = PostApiCoachBlocksByBlockIdExercisesResponses[keyof PostApiCoachBlocksByBlockIdExercisesResponses];
+
+export type DeleteApiCoachBlockExercisesByBlockExerciseIdData = {
+    body?: never;
+    path: {
+        blockExerciseId: string;
+    };
+    query?: never;
+    url: '/api/coach/block-exercises/{blockExerciseId}';
+};
+
+export type DeleteApiCoachBlockExercisesByBlockExerciseIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachBlockExercisesByBlockExerciseIdError = DeleteApiCoachBlockExercisesByBlockExerciseIdErrors[keyof DeleteApiCoachBlockExercisesByBlockExerciseIdErrors];
+
+export type DeleteApiCoachBlockExercisesByBlockExerciseIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachBlockExercisesByBlockExerciseIdResponse = DeleteApiCoachBlockExercisesByBlockExerciseIdResponses[keyof DeleteApiCoachBlockExercisesByBlockExerciseIdResponses];
+
+export type PatchApiCoachBlockExercisesByBlockExerciseIdData = {
+    body?: {
+        exerciseId: string;
+        sets: number;
+        reps: string;
+        loadType: 'WEIGHT' | 'PERCENTAGE' | 'NONE';
+        weight?: number | null;
+        percentage?: number | null;
+        targetRpe?: number | null;
+    };
+    path: {
+        blockExerciseId: string;
+    };
+    query?: never;
+    url: '/api/coach/block-exercises/{blockExerciseId}';
+};
+
+export type PatchApiCoachBlockExercisesByBlockExerciseIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachBlockExercisesByBlockExerciseIdError = PatchApiCoachBlockExercisesByBlockExerciseIdErrors[keyof PatchApiCoachBlockExercisesByBlockExerciseIdErrors];
+
+export type PatchApiCoachBlockExercisesByBlockExerciseIdResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PatchApiCoachBlockExercisesByBlockExerciseIdResponse = PatchApiCoachBlockExercisesByBlockExerciseIdResponses[keyof PatchApiCoachBlockExercisesByBlockExerciseIdResponses];
+
+export type PatchApiCoachBlocksByBlockIdExercisesReorderData = {
+    body?: {
+        items: Array<{
+            id: string;
+            order_index: number;
+        }>;
+    };
+    path: {
+        blockId: string;
+    };
+    query?: never;
+    url: '/api/coach/blocks/{blockId}/exercises/reorder';
+};
+
+export type PatchApiCoachBlocksByBlockIdExercisesReorderErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachBlocksByBlockIdExercisesReorderError = PatchApiCoachBlocksByBlockIdExercisesReorderErrors[keyof PatchApiCoachBlocksByBlockIdExercisesReorderErrors];
+
+export type PatchApiCoachBlocksByBlockIdExercisesReorderResponses = {
+    /**
+     * Listo
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PatchApiCoachBlocksByBlockIdExercisesReorderResponse = PatchApiCoachBlocksByBlockIdExercisesReorderResponses[keyof PatchApiCoachBlocksByBlockIdExercisesReorderResponses];
 
 export type GetApiAdminStatsData = {
     body?: never;
