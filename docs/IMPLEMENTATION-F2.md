@@ -287,7 +287,12 @@ Son **dos features distintas**, y conviene no confundirlas porque su perfil de s
 en nada. La primera es fácil y va en F3; la segunda choca con una regla de `CLAUDE.md` §4 y hay que
 decidirla explícitamente.
 
-#### A. El usuario cambia su propia contraseña — F3, fácil
+#### A. El usuario cambia su propia contraseña — ✅ IMPLEMENTADO EN F3
+
+> Está en `useAuth.changePassword` + la pantalla de perfil del jugador, tal como se especifica acá
+> abajo. Verificado en vivo con cuatro checks de `verify:setup` (incluido que después de un intento
+> fallido la contraseña vieja siga sirviendo, mirando el dato y no el error).
+> Ver `docs/IMPLEMENTATION-F3.md`.
 
 Va en la pantalla de perfil del jugador (y sirve igual para el coach). **No necesita la secret key ni
 una ruta nueva**: Supabase Auth deja que una sesión válida cambie su propia contraseña, así que se
@@ -378,6 +383,10 @@ Mientras no se decida, el camino es el script.
 - **No hay reordenamiento por drag&drop.** La ruta (`PATCH /coach/blocks/{id}/exercises/reorder`) y el
   helper puro (`reindex`) existen y están testeados; falta el gesto en la UI.
 - **La preview de impacto hace ~2 queries por jugador** (§2.7).
-- **Un coach puede editar `name`, `position_id`, `height_cm` y `weight_kg` de sus jugadores**, y en F3
+- ~~**Un coach puede editar `name`, `position_id`, `height_cm` y `weight_kg` de sus jugadores**, y en F3
   el jugador va a editar los mismos campos desde su perfil. Hay que decidir explícitamente si el
-  jugador puede sobrescribir lo que puso el coach.
+  jugador puede sobrescribir lo que puso el coach.~~
+  **Resuelto en F3, y esta línea era inexacta:** `playerProfileSchema` **no incluía `name`**, así que el
+  nombre no lo editaba nadie después del signup. F3 lo agregó al schema compartido, con lo que la
+  afirmación pasó a ser verdadera para los dos roles. La decisión del dueño del repo fue **los dos
+  editan los mismos campos y gana el último que escribe** — ver `docs/IMPLEMENTATION-F3.md` §2.3.
