@@ -52,3 +52,36 @@ export const sessionUserSchema = z.object({
 })
 
 export type SessionUser = z.infer<typeof sessionUserSchema>
+
+/**
+ * Cambio de la contraseña PROPIA (docs/IMPLEMENTATION-F2.md §5.5 A).
+ *
+ * No necesita ruta en la API: Supabase Auth deja que una sesión válida cambie su
+ * propia contraseña desde el cliente. `current` se pide porque updateUser NO la
+ * exige, y sin eso cualquiera con el dispositivo desbloqueado cambia la clave.
+ */
+export const changePasswordSchema = z
+  .object({
+    current: z.string().min(1, 'Ingresá tu contraseña actual'),
+    // Misma regla que registerSchema: una sola fuente para el mínimo.
+    next: z.string().min(8, 'Mínimo 8 caracteres').max(200),
+    confirm: z.string().min(1, 'Repetí la contraseña nueva'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.next !== data.confirm) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['confirm'],
+        message: 'Las dos contraseñas nuevas no coinciden',
+      })
+    }
+    if (data.next === data.current) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['next'],
+        message: 'La nueva tiene que ser distinta de la actual',
+      })
+    }
+  })
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
