@@ -7,7 +7,7 @@ export type Position = {
   order: number
 }
 
-/** Las 8 de rugby. Fijas por decisión de CLAUDE.md §2 — no viven en DynamoDB. */
+/** Las 8 de rugby. Fijas por decisión de CLAUDE.md §2 — no viven en la base. */
 export const POSITIONS = [
   { id: 'primera-linea', name: 'Primera Línea', type: 'FORWARD', order: 1 },
   { id: 'segunda-linea', name: 'Segunda Línea', type: 'FORWARD', order: 2 },
