@@ -32,6 +32,7 @@ const check = (name, pass, detail = '') => {
 }
 
 const created = []
+const createdPrograms = []
 async function makeUser(email, meta) {
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -163,9 +164,79 @@ try {
 
   const { data: exercisesSeen } = await asPlayer.from('exercises').select('id')
   check('RLS: un usuario autenticado sí ve el catálogo', (exercisesSeen ?? []).length === 24, `ve ${exercisesSeen?.length} ejercicios`)
+
+  // --- 0005: oráculos revocados (L-1) -------------------------------------
+  const { error: genErr } = await anonClient.rpc('generate_invite_code')
+  check('anon no puede invocar generate_invite_code', !!genErr, genErr ? '' : 'PUDO — falta el revoke')
+
+  const { error: oracleErr } = await asPlayer.rpc('program_reaches_me', {
+    target: '00000000-0000-0000-0000-000000000000',
+  })
+  check('authenticated no usa program_reaches_me como oráculo', !!oracleErr, oracleErr ? '' : 'PUDO — falta el revoke')
+
+  // --- 0005: autovínculo bloqueado y canje por RPC (M-1) ------------------
+  const looseId = await makeUser('loose.test@coachlab.local', { name: 'Loose Test', role: 'PLAYER' })
+  const asLoose = createClient(URL, ANON, { auth: { persistSession: false } })
+  await asLoose.auth.signInWithPassword({
+    email: 'loose.test@coachlab.local',
+    password: 'TestPassw0rd!x9',
+  })
+
+  const { error: selfLink } = await asLoose.from('profiles').update({ coach_id: coachId }).eq('id', looseId)
+  check('un jugador sin coach NO se autovincula por PATCH', !!selfLink, selfLink?.message?.slice(0, 60) ?? 'PUDO — agujero M-1')
+
+  const { error: badRedeem } = await asLoose.rpc('redeem_invite_code', { code: 'ZZZZZZ' })
+  check('redeem_invite_code rechaza un código inexistente', !!badRedeem)
+
+  const { error: redeemErr } = await asLoose.rpc('redeem_invite_code', { code: coach.invite_code })
+  check('redeem_invite_code vincula con un código válido', !redeemErr, redeemErr?.message ?? '')
+
+  const { data: loose } = await admin.from('profiles').select('coach_id').eq('id', looseId).single()
+  check('el canje dejó el coach_id correcto', loose?.coach_id === coachId)
+
+  const { error: reRedeem } = await asLoose.rpc('redeem_invite_code', { code: coach.invite_code })
+  check('un jugador ya vinculado no puede volver a canjear', !!reRedeem)
+
+  // --- 0005: email inmutable desde la tabla (L-2) -------------------------
+  const { error: mailErr } = await asPlayer.from('profiles').update({ email: 'otro@x.com' }).eq('id', playerId)
+  check('el guard frena el cambio de email', !!mailErr, mailErr?.message?.slice(0, 60) ?? 'PUDO — divergencia con auth.users')
+
+  // --- 0005: sin lectura cross-tenant de programas (H-1) ------------------
+  const coach2Id = await makeUser('coach2.test@coachlab.local', { name: 'Coach Dos', role: 'COACH' })
+
+  const { data: foreignProgram } = await admin
+    .from('programs')
+    .insert({ coach_id: coach2Id, name: 'Programa ajeno' })
+    .select('id')
+    .single()
+  createdPrograms.push(foreignProgram.id)
+  await admin.from('program_assignments').insert({ program_id: foreignProgram.id, system_group_id: 'backs' })
+  await admin.from('profiles').update({ position_id: 'wing' }).eq('id', playerId)
+
+  const { data: crossRead } = await asPlayer.from('programs').select('id').eq('id', foreignProgram.id)
+  check(
+    'H-1: un jugador NO ve programas de un coach ajeno aunque el assignment matchee',
+    (crossRead ?? []).length === 0,
+    `ve ${crossRead?.length ?? 0}`,
+  )
+
+  const { data: ownProgram } = await admin
+    .from('programs')
+    .insert({ coach_id: coachId, name: 'Programa propio' })
+    .select('id')
+    .single()
+  createdPrograms.push(ownProgram.id)
+  await admin.from('program_assignments').insert({ program_id: ownProgram.id, system_group_id: 'backs' })
+
+  const { data: ownRead } = await asPlayer.from('programs').select('id').eq('id', ownProgram.id)
+  check('...pero sí ve el de SU coach cuando el assignment lo alcanza', (ownRead ?? []).length === 1)
 } finally {
+  // Los programas primero: programs.coach_id referencia profiles.
+  if (createdPrograms.length > 0) {
+    await admin.from('programs').delete().in('id', createdPrograms)
+  }
   for (const id of created) await admin.auth.admin.deleteUser(id)
-  console.log(`\nlimpieza: ${created.length} usuarios de prueba borrados`)
+  console.log(`\nlimpieza: ${createdPrograms.length} programas y ${created.length} usuarios de prueba borrados`)
   const failed = results.filter((r) => !r.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks OK`)
   process.exit(failed.length ? 1 : 0)
