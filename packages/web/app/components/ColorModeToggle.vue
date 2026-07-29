@@ -31,7 +31,7 @@ const isDark = computed({
       color="neutral"
       variant="ghost"
       :aria-label="isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'"
-      @click="isDark = !isDark"
+      @click="() => { isDark = !isDark }"
     />
     <template #fallback>
       <div class="size-8" />

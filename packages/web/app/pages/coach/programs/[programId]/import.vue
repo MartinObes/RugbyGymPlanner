@@ -197,7 +197,7 @@ const loadOf = (exercise: {
             :color="tab === 'excel' ? 'primary' : 'neutral'"
             :variant="tab === 'excel' ? 'soft' : 'ghost'"
             size="sm"
-            @click="tab = 'excel'"
+            @click="() => { tab = 'excel' }"
           >
             Subir planilla
           </UButton>
@@ -205,7 +205,7 @@ const loadOf = (exercise: {
             :color="tab === 'text' ? 'primary' : 'neutral'"
             :variant="tab === 'text' ? 'soft' : 'ghost'"
             size="sm"
-            @click="tab = 'text'"
+            @click="() => { tab = 'text' }"
           >
             Pegar texto
           </UButton>
@@ -272,7 +272,7 @@ const loadOf = (exercise: {
         />
         <div class="flex flex-wrap gap-2">
           <UButton :disabled="!raw.trim()" @click="parsePastedText">Ver previsualización</UButton>
-          <UButton color="neutral" variant="ghost" @click="raw = EXAMPLE">Cargar ejemplo</UButton>
+          <UButton color="neutral" variant="ghost" @click="() => { raw = EXAMPLE }">Cargar ejemplo</UButton>
         </div>
         <details class="text-sm text-muted">
           <summary class="cursor-pointer">Formato esperado</summary>
@@ -321,7 +321,7 @@ const loadOf = (exercise: {
         </div>
 
         <template #footer>
-          <UButton :disabled="!canImport" @click="confirmOpen = true">Reemplazar programa</UButton>
+          <UButton :disabled="!canImport" @click="() => { confirmOpen = true }">Reemplazar programa</UButton>
         </template>
       </UCard>
 
@@ -350,7 +350,7 @@ const loadOf = (exercise: {
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" @click="confirmOpen = false">Cancelar</UButton>
+          <UButton color="neutral" variant="ghost" @click="() => { confirmOpen = false }">Cancelar</UButton>
           <UButton color="warning" :loading="importing" @click="apply">Reemplazar</UButton>
         </div>
       </template>

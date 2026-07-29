@@ -21,14 +21,16 @@ código del entrenador y el cambio de la contraseña propia.
 | API: 8 endpoints bajo `/player/*` con guard por prefijo | ✅ 14 tests nuevos |
 | Pantallas: Mi semana, Mi perfil, dos componentes | ✅ `Build complete` |
 | Migración `0015` | ✅ aplicada y **verificada en vivo** |
+| **`pnpm typecheck`** | ✅ los 3 paquetes, **incluido web por primera vez** (§5.2) |
 | **`pnpm verify:setup`** | ✅ **80/80** |
 | **`pnpm smoke:player`** (nuevo) | ✅ **22/22** |
 
 Tests: **247 en core + 82 en api + 3 en web = 332** (el baseline antes de F3 era 254).
 
-**Lo que NO está verificado**, a ojos abiertos: nadie miró las dos pantallas en un browser, y los
-archivos `.vue` no los typecheckea nada (§5.2). Por eso el roadmap de `CLAUDE.md` §6 **no** marca F3
-como completa todavía.
+**Lo que NO está verificado**, a ojos abiertos: **nadie miró las dos pantallas en un browser.** El
+autosave con debounce, el re-login después de cambiar la contraseña y que los inputs sean tocables a
+380 px no los cubre ningún test automático. Por eso el roadmap de `CLAUDE.md` §6 **no** marca F3 como
+completa todavía.
 
 ---
 
@@ -180,27 +182,37 @@ entre `programs` y `weeks` devolvía 500 en **cualquier** request real y pasó l
 re-login después de cambiar la contraseña, y que los inputs sean tocables a 380 px. Eso pide un
 click-through en un browser, que **todavía no se hizo**.
 
-### 5.2. Ni `nuxt typecheck` ni `nuxt build` chequean los `.vue`
+### 5.2. Nada typecheckeaba los `.vue` — RESUELTO, y destapó 15 errores
 
-Dos fallas que se suman y dejan el frontend sin ninguna red de tipos:
+Dos fallas se sumaban y dejaban el frontend **sin ninguna red de tipos**:
 
-- **`nuxt typecheck` crashea y devuelve exit 0.** `vue-tsc` 2.2.12 tira
-  `[Vue] Failed to create plugin` / `Load plugin failed: vue-router/volar/sfc-route-blocks`, imprime el
-  stack, escribe `Done` y sale bien. **Causa raíz:** `vue-router` 4.6.4 dejó de publicar el directorio
-  `volar/`, y `@vue/language-core` 2.2.12 lo sigue buscando. `2.2.12` es la última 2.x, así que el fix
-  exige **vue-tsc 3.x** — un major.
-- **`nuxt build` no typecheckea**: no hay bloque `typescript` en `nuxt.config.ts`, así que `typeCheck`
-  es `false` y el build solo transpila. **Verificado empíricamente**: con
-  `const x: number = "esto no es un number"` dentro de `profile.vue`, el build terminó con exit 0.
+- **`nuxt typecheck` crasheaba y devolvía exit 0.** `vue-tsc` 2.2.12 tiraba
+  `Load plugin failed: vue-router/volar/sfc-route-blocks`, imprimía el stack, escribía `Done` y salía
+  bien. **Causa raíz:** `vue-router` 4.6.4 dejó de publicar el directorio `volar/` y
+  `@vue/language-core` 2.2.12 lo seguía buscando. `2.2.12` es la última 2.x, así que el fix exigía
+  **vue-tsc 3.x**.
+- **`nuxt build` tampoco typecheckea.** No hay bloque `typescript` en `nuxt.config.ts`, así que
+  `typeCheck` es `false` y el build solo transpila. Esto **sigue siendo cierto**: el build no es un
+  gate de tipos y no hay que confiar en él como tal.
 
-**Mitigación usada en esta fase**, por no dejar el código sin verificar: una sonda temporal en TS que
-importaba los tipos del cliente generado y ejercitaba los 33 accesos exactos que usan los cuatro
-archivos `.vue` (`day.loggedCount`, `exercise.load.kg`, `profile.oneRms[0].exerciseName`, …). Pasó
-limpia y se borró. Cubre el riesgo real de esos archivos —referirse a un campo que el cliente generado
-no tiene— pero **no** es un typecheck de los templates.
+**Cómo se comprobó, en las dos direcciones** —que es lo que evita "arreglé algo que ya funcionaba" y su
+inverso, "pasa porque sigue roto"—: con `const x: number = "esto no es un number"` dentro de
+`profile.vue`, **antes** el build y el typecheck salían con exit 0; **después** del bump el typecheck
+corta con `error TS2322` y `Exit status 2`.
 
-**Pendiente de decisión del dueño del repo:** bumpear a `vue-tsc` 3.x. Como los `.vue` nunca se
-chequearon, encenderlo puede destapar errores preexistentes de F2 en cantidad desconocida.
+**Los 15 errores que estaban escondidos**, todos `TS2322`:
+
+| Categoría | Cuántos | Qué era |
+|---|---|---|
+| `@click="x = y"` | 13 | Una asignación inline **devuelve el valor asignado**, y Nuxt UI tipa `onClick` como `(event) => void \| Promise<void>`. Se envuelven en `@click="() => { x = y }"` |
+| `USelect` con `null` | 2 | `USelect` deriva su tipo de `:items`, así que no acepta `null`. Eran el RPE de `ExerciseRow.vue` y el puesto de `profile.vue` |
+
+Doce eran preexistentes (F1 y F2), dos eran de F3. Ninguno rompía en runtime —Vue ignora el valor de
+retorno de un handler y trata `null` como "sin selección"—, pero eran exactamente el ruido que hacía
+imposible distinguir un error real: con 15 fallas de fondo, la 16ª pasa desapercibida.
+
+El del puesto se arregló **estrechando con el guard del dominio** (`isPositionId`) en vez de casteando:
+si la base tuviera un slug que el código no conoce, el select queda sin selección en lugar de romperse.
 
 ### 5.3. `pnpm lint` no existe
 

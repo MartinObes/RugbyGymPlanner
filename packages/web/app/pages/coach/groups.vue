@@ -121,7 +121,7 @@ const positionName = (id: string) => positionById(id)?.name ?? id
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" @click="draft = null">Cancelar</UButton>
+          <UButton color="neutral" variant="ghost" @click="() => { draft = null }">Cancelar</UButton>
           <UButton :disabled="!canSave" :loading="saving" @click="save">
             {{ draft.id ? 'Guardar' : 'Crear grupo' }}
           </UButton>

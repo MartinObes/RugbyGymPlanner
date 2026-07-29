@@ -60,7 +60,7 @@ async function remove() {
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-bold">Programas</h1>
-      <UButton icon="i-lucide-plus" @click="creating = true">Nuevo programa</UButton>
+      <UButton icon="i-lucide-plus" @click="() => { creating = true }">Nuevo programa</UButton>
     </div>
 
     <UAlert v-if="error" color="error" title="No se pudo cargar" :description="error.message" />
@@ -76,7 +76,7 @@ async function remove() {
           />
         </UFormField>
         <UButton :disabled="!newName.trim()" :loading="saving" @click="create">Crear</UButton>
-        <UButton color="neutral" variant="ghost" @click="creating = false">Cancelar</UButton>
+        <UButton color="neutral" variant="ghost" @click="() => { creating = false }">Cancelar</UButton>
       </div>
       <p class="mt-2 text-sm text-muted">Se crea con Semana 1 y Día 1 listos para editar.</p>
     </UCard>
@@ -104,7 +104,7 @@ async function remove() {
             variant="ghost"
             size="xs"
             aria-label="Borrar"
-            @click="confirmingDelete = { id: program.id, name: program.name }"
+            @click="() => { confirmingDelete = { id: program.id, name: program.name } }"
           />
         </div>
       </UCard>
@@ -119,7 +119,7 @@ async function remove() {
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" @click="confirmingDelete = null">Cancelar</UButton>
+          <UButton color="neutral" variant="ghost" @click="() => { confirmingDelete = null }">Cancelar</UButton>
           <UButton color="error" @click="remove">Borrar programa</UButton>
         </div>
       </template>

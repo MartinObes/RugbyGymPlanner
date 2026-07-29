@@ -284,7 +284,9 @@ renderizan hasta que el padre incluya `<NuxtPage />`.
 ### Flujo de trabajo
 
 - Ramas `feature/<nombre>` desde `main`. Commits chicos con mensaje imperativo en inglés.
-- Antes de dar por terminada una feature: `pnpm lint && pnpm typecheck && pnpm test`.
+- Antes de dar por terminada una feature: `pnpm typecheck && pnpm test`.
+  > **`pnpm lint` todavía no existe** (2026-07-29). El script del root hace `pnpm -r lint` y ningún package define `lint`, así que falla con `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT`. Nunca fue ejecutable. **Decisión pendiente:** agregar ESLint (probablemente `@nuxt/eslint`, que trae config flat sin ceremonia) o sacar el script del root. Mientras no se resuelva, el gate real es typecheck + test.
+  > **`pnpm typecheck` sí cubre los `.vue` desde F3**: antes `vue-tsc` crasheaba y salía con código 0, o sea que daba verde sin mirar el frontend. Ver `docs/IMPLEMENTATION-F3.md` §5.2. **`nuxt build` NO typecheckea** (`typeCheck` está en false): no sirve como gate de tipos.
 - Si una decisión de §2 o §3 cambia, **actualizar este archivo en el mismo PR**.
 
 ### Levantar el proyecto
@@ -316,7 +318,7 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 - [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
 - [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 4 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import de las planillas reales del club**. → `docs/IMPLEMENTATION-F2.md`
 - [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), **cambiar su propia contraseña**, Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día. → `docs/IMPLEMENTATION-F3.md`
-  > **Implementada y verificada contra la base; falta cerrarla.** Rama `feature/f3`: 332 tests, `verify:setup` 80/80, `smoke:player` 22/22 (incluye "80% → 112 kg" y "última vez" con datos reales), migración `0015` aplicada. **Lo que falta para marcarla `[x]`:** (1) un click-through en el browser — nadie miró las dos pantallas todavía; (2) decidir el bump a `vue-tsc` 3.x, porque hoy **nada typecheckea los `.vue`** (`nuxt typecheck` crashea y sale con código 0, y `nuxt build` solo transpila). Detalle en `docs/IMPLEMENTATION-F3.md` §5.2.
+  > **Implementada y verificada contra la base; falta el click-through.** Rama `feature/f3`: 332 tests, `pnpm typecheck` verde en los 3 paquetes, `verify:setup` 80/80, `smoke:player` 22/22 (incluye "80% → 112 kg" y "última vez" con datos reales), migración `0015` aplicada. **Lo único que falta para marcarla `[x]`:** mirar las dos pantallas en un browser — el autosave con debounce, el re-login tras cambiar la contraseña y los inputs a 380 px no los cubre ningún test.
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; keepalive de UptimeRobot; dominio propio si se quiere.
   > **Decisión pendiente:** cómo recupera la contraseña un jugador que se la olvidó. Resetear la de OTRO usuario exige la `service_role`, que §4 prohíbe en un request, así que no es "agregar un botón": las tres opciones y sus riesgos están en `docs/IMPLEMENTATION-F2.md` §5.5 B. Hoy el camino es `pnpm set:password`.
 

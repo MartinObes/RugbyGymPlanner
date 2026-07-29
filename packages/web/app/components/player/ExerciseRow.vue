@@ -19,7 +19,10 @@ const weight = ref<number | null>(
       : null),
 )
 const reps = ref<number | null>(props.exercise.entry?.reps ?? null)
-const rpe = ref<number | null>(props.exercise.entry?.rpe ?? null)
+// `undefined` y no `null`: USelect deriva su tipo de :items (number[]), así que
+// no acepta null. La ruta hace `input.rpe ?? null` y el schema es nullish, con
+// lo que "sin RPE" llega igual a la base como null.
+const rpe = ref<number | undefined>(props.exercise.entry?.rpe ?? undefined)
 
 const { trigger, state, error } = useDebouncedSave(async () => {
   await api.put(`/api/player/days/${props.dayId}/entries/${props.exercise.id}`, {

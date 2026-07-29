@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { POSITIONS } from '@coachlab/core/domain/positions'
+import { POSITIONS, isPositionId, type PositionId } from '@coachlab/core/domain/positions'
 import { changePasswordSchema } from '@coachlab/core/validators/auth'
 import { playerProfileSchema } from '@coachlab/core/validators/player'
 import type { ExercisesResponse, PlayerProfileResponse } from '~~/generated'
@@ -20,16 +20,33 @@ const exercises = computed(() => catalog.value?.exercises ?? [])
 
 const positionItems = POSITIONS.map((p) => ({ label: p.name, value: p.id }))
 
-const profileForm = reactive({
+// El puesto guardado viene como `string | null` del contrato de la API, pero
+// USelect deriva su tipo de :items, así que solo acepta un PositionId (o
+// undefined). Se estrecha acá con el guard del dominio en vez de castear: si la
+// base tuviera un slug que el código no conoce, queda sin seleccionar en lugar
+// de romper el select.
+const storedPosition = data.value?.profile.positionId
+
+const profileForm = reactive<{
+  name: string
+  positionId: PositionId | undefined
+  heightCm: number | null
+  weightKg: number | null
+}>({
   name: data.value?.profile.name ?? '',
-  positionId: data.value?.profile.positionId ?? null,
+  positionId: storedPosition && isPositionId(storedPosition) ? storedPosition : undefined,
   heightCm: data.value?.profile.heightCm ?? null,
   weightKg: data.value?.profile.weightKg ?? null,
 })
 
 async function saveProfile() {
   try {
-    await api.patch('/api/player/profile', { ...profileForm })
+    // positionId viaja como null cuando no hay ninguno elegido: el schema es
+    // nullish y la ruta escribe null, no deja el campo sin tocar.
+    await api.patch('/api/player/profile', {
+      ...profileForm,
+      positionId: profileForm.positionId ?? null,
+    })
     await Promise.all([refresh(), refreshSession()])
     toast.add({ title: 'Perfil guardado' })
   } catch (error) {

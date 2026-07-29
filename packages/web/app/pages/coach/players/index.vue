@@ -109,7 +109,7 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
             size="sm"
             :loading="releasing === player.id"
             aria-label="Sacar del plantel"
-            @click="confirming = { id: player.id, name: player.name }"
+            @click="() => { confirming = { id: player.id, name: player.name } }"
           />
         </li>
       </ul>
@@ -124,7 +124,7 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" @click="confirming = null">Cancelar</UButton>
+          <UButton color="neutral" variant="ghost" @click="() => { confirming = null }">Cancelar</UButton>
           <UButton color="error" :loading="releasing !== null" @click="release">
             Sacar del plantel
           </UButton>
