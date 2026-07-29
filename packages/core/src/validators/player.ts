@@ -11,6 +11,10 @@ import { isPositionId } from '../domain/positions'
  * desde el objeto ya validado. Tres capas para la misma cosa (CLAUDE.md §4).
  */
 export const playerProfileSchema = z.object({
+  // Mismo mínimo que registerSchema. El jugador puede corregir su propio nombre
+  // y el coach también: los dos editan los mismos campos y gana el último que
+  // escribe (decisión del spec de F3 §3.2).
+  name: z.string().trim().min(2, 'Poné tu nombre (mínimo 2 letras)').max(80).optional(),
   positionId: z.string().refine(isPositionId, 'Puesto inválido').nullish(),
   heightCm: z.number().int().min(100, 'Muy poco').max(250, 'Demasiado').nullish(),
   weightKg: z.number().min(30, 'Muy poco').max(250, 'Demasiado').nullish(),
