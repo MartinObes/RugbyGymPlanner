@@ -1,9 +1,14 @@
-export type LoadType = 'WEIGHT' | 'PERCENTAGE' | 'NONE'
+export type LoadType = 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL'
 
 export type LoadSpec = {
   loadType: LoadType
   weight?: number | null
   percentage?: number | null
+  /**
+   * Cuarto modo (migración 0013): carga que no es un número ni un porcentaje.
+   * `p.corp`, `barra`, `goma`, `m.band`, `med 9`, `60 . 120`.
+   */
+  loadLabel?: string | null
 }
 
 export type LoadContext = {
@@ -15,6 +20,7 @@ export type LoadResult =
   | { kind: 'weight'; kg: number; label: string }
   | { kind: 'percentage'; kg: number; percentage: number; label: string }
   | { kind: 'missing-1rm'; percentage: number; exerciseName: string; label: string }
+  | { kind: 'label'; label: string }
   | { kind: 'none'; label: string }
 
 /** Redondeo a 0.5 kg, igual que el prototipo. */
@@ -51,6 +57,16 @@ export function calcLoad(spec: LoadSpec, ctx: LoadContext): LoadResult {
       percentage: spec.percentage,
       label: `${spec.percentage}% → ${formatKg(kg)}`,
     }
+  }
+
+  /**
+   * La etiqueta se muestra CRUDA. `p.corp`, `barra`, `med 9` son las
+   * abreviaturas que los jugadores ya leen en las planillas impresas del
+   * preparador; expandirlas exigiría inventar un diccionario y adivinar.
+   */
+  if (spec.loadType === 'LABEL') {
+    const label = spec.loadLabel?.trim()
+    if (label) return { kind: 'label', label }
   }
 
   return { kind: 'none', label: 'Sin peso' }
