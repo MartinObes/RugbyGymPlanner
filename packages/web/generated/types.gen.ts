@@ -28,11 +28,30 @@ export type CoachPlayer = {
     name: string;
     email: string;
     positionId: string | null;
+    heightCm: number | null;
+    weightKg: number | null;
 };
 
 export type CoachPlayersResponse = {
     ok: true;
     players: Array<CoachPlayer>;
+};
+
+export type OneRm = {
+    exerciseId: string;
+    exerciseName: string;
+    kg: number;
+    updatedAt: string;
+};
+
+export type CoachPlayerResponse = {
+    ok: true;
+    player: CoachPlayer;
+    oneRms: Array<OneRm>;
+};
+
+export type OkResponse = {
+    ok: true;
 };
 
 export type AdminStatsResponse = {
@@ -110,6 +129,172 @@ export type GetApiCoachPlayersResponses = {
 };
 
 export type GetApiCoachPlayersResponse = GetApiCoachPlayersResponses[keyof GetApiCoachPlayersResponses];
+
+export type GetApiCoachPlayersByPlayerIdData = {
+    body?: never;
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}';
+};
+
+export type GetApiCoachPlayersByPlayerIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type GetApiCoachPlayersByPlayerIdError = GetApiCoachPlayersByPlayerIdErrors[keyof GetApiCoachPlayersByPlayerIdErrors];
+
+export type GetApiCoachPlayersByPlayerIdResponses = {
+    /**
+     * Ficha
+     */
+    200: CoachPlayerResponse;
+};
+
+export type GetApiCoachPlayersByPlayerIdResponse = GetApiCoachPlayersByPlayerIdResponses[keyof GetApiCoachPlayersByPlayerIdResponses];
+
+export type PatchApiCoachPlayersByPlayerIdData = {
+    body?: {
+        positionId?: string | null;
+        heightCm?: number | null;
+        weightKg?: number | null;
+    };
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}';
+};
+
+export type PatchApiCoachPlayersByPlayerIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type PatchApiCoachPlayersByPlayerIdError = PatchApiCoachPlayersByPlayerIdErrors[keyof PatchApiCoachPlayersByPlayerIdErrors];
+
+export type PatchApiCoachPlayersByPlayerIdResponses = {
+    /**
+     * Actualizado
+     */
+    200: {
+        ok: true;
+        player: CoachPlayer;
+    };
+};
+
+export type PatchApiCoachPlayersByPlayerIdResponse = PatchApiCoachPlayersByPlayerIdResponses[keyof PatchApiCoachPlayersByPlayerIdResponses];
+
+export type PutApiCoachPlayersByPlayerIdOneRmData = {
+    body?: {
+        exerciseId: string;
+        kg: number;
+    };
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}/one-rm';
+};
+
+export type PutApiCoachPlayersByPlayerIdOneRmErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type PutApiCoachPlayersByPlayerIdOneRmError = PutApiCoachPlayersByPlayerIdOneRmErrors[keyof PutApiCoachPlayersByPlayerIdOneRmErrors];
+
+export type PutApiCoachPlayersByPlayerIdOneRmResponses = {
+    /**
+     * Guardado
+     */
+    200: OkResponse;
+};
+
+export type PutApiCoachPlayersByPlayerIdOneRmResponse = PutApiCoachPlayersByPlayerIdOneRmResponses[keyof PutApiCoachPlayersByPlayerIdOneRmResponses];
+
+export type DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdData = {
+    body?: never;
+    path: {
+        playerId: string;
+        exerciseId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}/one-rm/{exerciseId}';
+};
+
+export type DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdError = DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdErrors[keyof DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdErrors];
+
+export type DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdResponses = {
+    /**
+     * Borrado
+     */
+    200: OkResponse;
+};
+
+export type DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdResponse = DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdResponses[keyof DeleteApiCoachPlayersByPlayerIdOneRmByExerciseIdResponses];
+
+export type PostApiCoachPlayersByPlayerIdReleaseData = {
+    body?: never;
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}/release';
+};
+
+export type PostApiCoachPlayersByPlayerIdReleaseErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachPlayersByPlayerIdReleaseError = PostApiCoachPlayersByPlayerIdReleaseErrors[keyof PostApiCoachPlayersByPlayerIdReleaseErrors];
+
+export type PostApiCoachPlayersByPlayerIdReleaseResponses = {
+    /**
+     * Desvinculado
+     */
+    200: OkResponse;
+};
+
+export type PostApiCoachPlayersByPlayerIdReleaseResponse = PostApiCoachPlayersByPlayerIdReleaseResponses[keyof PostApiCoachPlayersByPlayerIdReleaseResponses];
 
 export type GetApiAdminStatsData = {
     body?: never;

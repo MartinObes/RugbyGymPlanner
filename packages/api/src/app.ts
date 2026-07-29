@@ -3,8 +3,8 @@ import { requireRole, withActor, type AuthVariables } from './middleware/auth'
 import { onError } from './middleware/error'
 import { admin } from './routes/admin'
 import { auth } from './routes/auth'
+import { players } from './routes/coach/players'
 import { health } from './routes/health'
-import { players } from './routes/players'
 
 /**
  * App Hono de CoachLab.

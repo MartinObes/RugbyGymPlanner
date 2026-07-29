@@ -343,6 +343,29 @@ try {
   const { error: playerReleaseOther } = await asPlayer.rpc('release_player', { player_id: sneakyId })
   check('un jugador no puede desvincular a un compañero', !!playerReleaseOther)
 
+  // --- 0011: el coach puede cargar el 1RM de su jugador -------------------
+  const { data: anExercise } = await admin.from('exercises').select('id').limit(1).single()
+  const { error: coachRmErr } = await asCoachEarly
+    .from('one_rms')
+    .upsert({ player_id: playerId, exercise_id: anExercise.id, kg: 120 })
+  check('el coach puede cargar el 1RM de su jugador', !coachRmErr, coachRmErr?.message?.slice(0, 60) ?? '')
+
+  const { error: foreignRmErr } = await asCoachEarly
+    .from('one_rms')
+    .upsert({ player_id: sneakyId, exercise_id: anExercise.id, kg: 120 })
+  check(
+    '...pero no el de alguien que no es de su plantel',
+    !!foreignRmErr,
+    foreignRmErr?.message?.slice(0, 45) ?? 'PUDO — agujero',
+  )
+
+  // El log del jugador sigue siendo intocable para el coach: es el dato que da
+  // sentido al producto (RPE objetivo vs. percibido).
+  const { error: coachLogErr } = await asCoachEarly
+    .from('session_logs')
+    .insert({ player_id: playerId, day_id: '00000000-0000-0000-0000-000000000000' })
+  check('el coach NO puede escribir el log de un jugador', !!coachLogErr)
+
   // --- 0006: desvinculación (M-1 de la re-auditoría) ----------------------
   // Va AL FINAL: deja al jugador sin coach y eso cambia lo que ve por RLS.
   const { error: selfUnlink } = await asPlayer.from('profiles').update({ coach_id: null }).eq('id', playerId)
