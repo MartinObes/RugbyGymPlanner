@@ -312,7 +312,8 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 
 - [x] **F0 — Setup**: monorepo pnpm, proyecto Supabase, schema completo con RLS, tipos generados, Hono con OpenAPI montado en Nitro, Nuxt SSR, funciones puras de dominio con tests, deploy a Vercel. → `docs/IMPLEMENTATION-F0.md`
 - [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
-- [ ] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 3 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import Excel/texto**.
+- [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 3 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import Excel/texto**. → `docs/IMPLEMENTATION-F2.md`
+  > **Pendiente de validación:** el formato de import Excel/texto se implementó sin `coach.html` a la vista. Confirmar contra el prototipo o con un coach real antes de F4.
 - [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; keepalive de UptimeRobot; dominio propio si se quiere.
 
