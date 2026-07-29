@@ -18,6 +18,7 @@ function fakeActor(role: Role): Actor {
     role,
     inviteCode: null,
     coachId: null,
+    positionId: null,
   }
 }
 
