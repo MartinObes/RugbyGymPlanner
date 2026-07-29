@@ -453,6 +453,37 @@ try {
   })
   check('ensure_exercise es idempotente: devuelve el mismo id', ensuredAgain === ensuredId)
 
+  // 0012: un JUGADOR no puede escribir el catálogo global. Era el HIGH de la
+  // auditoría de F2 y era explotable: la RPC es security definer, tenía grant a
+  // `authenticated` y su único control era `auth.uid() is null`, así que
+  // cualquiera que se registrara pegaba directo en /rest/v1/rpc sin pasar por
+  // Hono. El guard de /coach/* no protege lo que se invoca por PostgREST.
+  const { error: playerCatalogWrite } = await asPlayer.rpc('ensure_exercise', {
+    p_name: 'Ataque Al Catalogo',
+    p_normalized: 'ataque al catalogo',
+  })
+  check(
+    'un PLAYER no puede escribir el catálogo con ensure_exercise',
+    !!playerCatalogWrite,
+    playerCatalogWrite?.message ?? 'PUDO — agujero HIGH reabierto',
+  )
+
+  // 0012: p_normalized viene del cliente, así que se valida que sea plausiblemente
+  // salida de normName(). Un normalized de 2 letras secuestra el matching de rmFor.
+  const { error: badNormErr } = await asCoachEarly.rpc('ensure_exercise', {
+    p_name: 'Sentadilla Trasera',
+    p_normalized: 'BA',
+  })
+  check('ensure_exercise rechaza un normalized_name inválido', !!badNormErr)
+
+  // ...pero la ñ sí pasa: normName la preserva a propósito.
+  const { data: enyeId, error: enyeErr } = await asCoachEarly.rpc('ensure_exercise', {
+    p_name: 'Ejercicio Mañana Test',
+    p_normalized: 'ejercicio mañana test',
+  })
+  check('ensure_exercise acepta la ñ que normName preserva', !!enyeId && !enyeErr, enyeErr?.message ?? '')
+  if (enyeId) createdExercises.push(enyeId)
+
   // ...pero NO puede pisar ni borrar el catálogo (exercises_write sigue ADMIN).
   const { error: catalogUpdateErr } = await asCoachEarly
     .from('exercises')

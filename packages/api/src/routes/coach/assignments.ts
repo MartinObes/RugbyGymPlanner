@@ -72,8 +72,20 @@ assignments.openapi(
     },
   }),
   async (c) => {
+    const actor = c.get('actor')!
     const { programId } = c.req.valid('param')
     const db = c.get('db')
+
+    // Sin esto, un programa ajeno respondía `200 []` en vez de 404: RLS no
+    // filtraba nada de más, pero el contrato de GET /coach/programs/{id} dice
+    // 404 y esta ruta decía otra cosa.
+    const { data: program, error: programError } = await db
+      .from('programs')
+      .select('id')
+      .eq('id', programId)
+      .eq('coach_id', actor.id)
+      .maybeSingle()
+    assertRow(program, programError)
 
     const { data, error } = await db
       .from('program_assignments')

@@ -281,10 +281,24 @@ players.openapi(
     },
   }),
   async (c) => {
+    const actor = c.get('actor')!
     const { playerId, exerciseId } = c.req.valid('param')
+    const db = c.get('db')
 
-    const { data, error } = await c
-      .get('db')
+    // Mismo pre-chequeo que el PUT: hoy RLS ya alcanzaría (one_rms_write incluye
+    // is_my_player desde 0011), pero esa política fue `player_id = auth.uid()`
+    // hasta hace dos migraciones. Si alguien la vuelve a angostar, sin esto la
+    // ruta se convierte en un delete cross-tenant silencioso.
+    const { data: owned, error: ownedError } = await db
+      .from('profiles')
+      .select('id')
+      .eq('id', playerId)
+      .eq('coach_id', actor.id)
+      .eq('role', 'PLAYER')
+      .maybeSingle()
+    assertRow(owned, ownedError)
+
+    const { data, error } = await db
       .from('one_rms')
       .delete()
       .eq('player_id', playerId)

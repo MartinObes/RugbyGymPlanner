@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { normName } from '@coachlab/core/domain/normName'
-import { parsedProgramSchema } from '@coachlab/core/validators/parsedProgram'
+import { importRequestSchema } from '@coachlab/core/validators/parsedProgram'
 import type { AuthVariables } from '../../middleware/auth'
 import { ErrorResponse } from '../schemas'
 import { assertRow } from './_scope'
@@ -27,7 +27,7 @@ export const programImport = new OpenAPIHono<{ Variables: AuthVariables }>().ope
     summary: 'Reemplazar el contenido del programa con un árbol importado',
     request: {
       params: ProgramIdParam,
-      body: { content: { 'application/json': { schema: parsedProgramSchema } } },
+      body: { content: { 'application/json': { schema: importRequestSchema } } },
     },
     responses: {
       200: { description: 'Importado', content: { 'application/json': { schema: ImportResponse } } },
@@ -44,7 +44,11 @@ export const programImport = new OpenAPIHono<{ Variables: AuthVariables }>().ope
   async (c) => {
     const actor = c.get('actor')!
     const { programId } = c.req.valid('param')
-    // El cliente parsea, pero el server NO confía: parsedProgramSchema revalida.
+    // El cliente parsea, pero el server NO confía: importRequestSchema revalida,
+    // y sus superRefine espejan los CHECK de la base. Eso es lo que garantiza que
+    // cuando lleguemos al delete del árbol, lo nuevo es insertable — antes, un
+    // CIRCUIT sin vueltas pasaba la validación y moría en el insert dejando el
+    // programa vacío.
     const parsed = c.req.valid('json')
     const db = c.get('db')
 

@@ -12,8 +12,26 @@ import { NotFoundError } from '@coachlab/core/access/rbac'
  * Usar SIEMPRE con `.select(...).maybeSingle()` al final de la escritura: sin el
  * select, PostgREST no devuelve la fila y no hay nada que comprobar.
  */
-export function assertRow<T>(row: T | null | undefined, error?: { message: string } | null): T {
-  if (error) throw new Error(error.message)
+/**
+ * Códigos de Postgres que significan "el padre no es tuyo o no existe", y que en
+ * un INSERT llegan como error en vez de como 0 filas:
+ *
+ *   42501 → violación de RLS (el padre existe pero no lo podés escribir)
+ *   23503 → violación de FK  (el padre no existe)
+ *
+ * Los dos son 404 para el cliente, con el MISMO body: distinguirlos sería un
+ * oráculo de existencia de recursos ajenos (CLAUDE.md §4).
+ */
+const NOT_FOUND_CODES = new Set(['42501', '23503'])
+
+export function assertRow<T>(
+  row: T | null | undefined,
+  error?: { message: string; code?: string } | null,
+): T {
+  if (error) {
+    if (error.code && NOT_FOUND_CODES.has(error.code)) throw new NotFoundError()
+    throw new Error(error.message)
+  }
   if (row == null) throw new NotFoundError()
   return row
 }

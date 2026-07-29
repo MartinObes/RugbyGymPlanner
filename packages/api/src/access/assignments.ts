@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { systemGroupForPosition } from '@coachlab/core/domain/positions'
+import { isPositionId, systemGroupForPosition } from '@coachlab/core/domain/positions'
 import {
   resolveProgram,
   type AssignmentKind,
@@ -55,6 +55,14 @@ export async function candidateAssignmentsFor(
   db: SupabaseClient,
   player: { id: string; positionId: string | null },
 ): Promise<CandidateAssignment[]> {
+  // El `.or()` de abajo se arma interpolando strings, así que el positionId
+  // tiene que ser uno de los 8 slugs y no texto arbitrario. Hoy siempre viene de
+  // la base (dominio position_slug), pero este helper lo va a reusar F3 y ahí
+  // podría llegar del cliente: `wing,player_id.eq.<uuid>` extendería el filtro.
+  if (player.positionId !== null && !isPositionId(player.positionId)) {
+    throw new Error(`Puesto inválido: ${player.positionId}`)
+  }
+
   const systemGroup = systemGroupForPosition(player.positionId)
 
   let groupIds: string[] = []

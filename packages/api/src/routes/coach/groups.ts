@@ -159,18 +159,28 @@ groups.openapi(
 
     const group = assertRow(data, error)
 
-    // Reemplazar NO es upsert: hay que borrar los puestos que ya no están, o
-    // sacar un puesto de un grupo no tendría efecto.
+    // Reemplazar los puestos: primero AGREGAR los nuevos, después borrar los que
+    // sobran. El orden importa y no es cosmético — con delete-y-después-insert,
+    // si el insert falla el grupo queda SIN PUESTOS, y entonces todo assignment
+    // que lo apunte deja de alcanzar a nadie sin ningún error visible: un cambio
+    // silencioso de a quién le llega un programa.
+    //
+    // `ignoreDuplicates` porque la PK es (group_id, position_id) y los que ya
+    // estaban vuelven a venir en la lista.
+    const { error: insertError } = await db
+      .from('position_group_positions')
+      .upsert(
+        input.positionIds.map((positionId) => ({ group_id: groupId, position_id: positionId })),
+        { onConflict: 'group_id,position_id', ignoreDuplicates: true },
+      )
+    if (insertError) throw new Error(insertError.message)
+
     const { error: deleteError } = await db
       .from('position_group_positions')
       .delete()
       .eq('group_id', groupId)
+      .not('position_id', 'in', `(${input.positionIds.join(',')})`)
     if (deleteError) throw new Error(deleteError.message)
-
-    const { error: insertError } = await db
-      .from('position_group_positions')
-      .insert(input.positionIds.map((positionId) => ({ group_id: groupId, position_id: positionId })))
-    if (insertError) throw new Error(insertError.message)
 
     return c.json(
       {

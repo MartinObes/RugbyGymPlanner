@@ -110,9 +110,17 @@ export const assignmentSchema = z
 
 export type AssignmentInput = z.infer<typeof assignmentSchema>
 
-/** Reordenar hermanos: lo que produce `reindex` de domain/tree. */
+/**
+ * Reordenar hermanos: lo que produce `reindex` de domain/tree.
+ *
+ * `max(50)` porque la ruta hace un round-trip por ítem: sin cota, un body de
+ * 10.000 entradas son 10.000 queries en un request.
+ */
 export const reorderSchema = z.object({
-  items: z.array(z.object({ id: z.string().uuid(), order_index: z.number().int().min(0) })).min(1),
+  items: z
+    .array(z.object({ id: z.string().uuid(), order_index: z.number().int().min(0) }))
+    .min(1)
+    .max(50),
 })
 
 export type ReorderInput = z.infer<typeof reorderSchema>
