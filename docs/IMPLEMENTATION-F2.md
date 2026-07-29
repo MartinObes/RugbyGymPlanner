@@ -267,6 +267,31 @@ También se corrigió `blocks.type`, que era `text` libre y nullable: ahora es `
 `CHECK` que exige vueltas en `CIRCUIT` y las prohíbe en `SINGLE` (`0008`), al mismo nivel que la
 coherencia de `LoadType`.
 
+## 5.5. No hay recuperación de contraseña, y con el free tier no es trivial
+
+Las contraseñas son hashes bcrypt en `auth.users.encrypted_password`: no se pueden leer, ni con la
+secret key. Eso está bien. El problema es lo que pasa cuando un jugador se olvide la suya, que a 40–60
+jugadores va a pasar seguido.
+
+Hoy el único camino es `pnpm set:password <email> [clave]` (`scripts/set-password.mjs`), un script de
+administración que corre a mano y le escribe una contraseña nueva — temporal y aleatoria si no se le
+pasa ninguna. Sirve para el caso real del club, donde el coach está con el jugador y se la dicta.
+
+**Por qué no alcanza el mail de recuperación:** Supabase trae un enviador incluido, pero su cuota en el
+plan free es de unos pocos mails por hora y está pensado para desarrollo, no para producción. Con la
+confirmación de email apagada (decisión de F1) tampoco hay dirección verificada.
+
+Opciones para F4, todas compatibles con el $0 de `CLAUDE.md` §1:
+
+1. **Un botón "resetear contraseña" en el panel del coach** que llame a una RPC o ruta con el mismo
+   efecto que el script. Cero servicios nuevos, y calza con el flujo presencial del club. Es lo más
+   barato y probablemente lo correcto.
+2. **SMTP propio gratuito** (Brevo da 300 mails/día sin tarjeta; Resend 3.000/mes) enganchado a
+   Supabase Auth, y usar el flujo de recuperación estándar. Suma un servicio y hay que verificar que
+   no cobre al crecer — evaluarlo contra §2 antes.
+
+Mientras no se decida, el camino es el script.
+
 ## 6. Deuda conocida
 
 - **El formato del import está validado** (§3.5) contra dos libros reales, pero solo contra esos dos.
