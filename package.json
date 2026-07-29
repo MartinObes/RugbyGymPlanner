@@ -13,7 +13,8 @@
     "dump:openapi": "tsx scripts/dump-openapi.ts",
     "seed": "tsx scripts/seed.ts",
     "verify:setup": "node scripts/verify-setup.mjs",
-    "set:password": "node scripts/set-password.mjs"
+    "set:password": "node scripts/set-password.mjs",
+    "smoke:player": "tsx scripts/smoke-player.ts"
   },
   "devDependencies": {
     "@coachlab/api": "workspace:*",
