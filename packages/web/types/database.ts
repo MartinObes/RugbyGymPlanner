@@ -566,6 +566,7 @@ export type Database = {
       owns_program: { Args: { target: string }; Returns: boolean }
       program_reaches_me: { Args: { target: string }; Returns: boolean }
       redeem_invite_code: { Args: { code: string }; Returns: undefined }
+      release_player: { Args: { player_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

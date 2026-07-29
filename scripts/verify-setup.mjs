@@ -33,6 +33,7 @@ const check = (name, pass, detail = '') => {
 
 const created = []
 const createdPrograms = []
+const createdGroups = []
 async function makeUser(email, meta) {
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -230,13 +231,124 @@ try {
 
   const { data: ownRead } = await asPlayer.from('programs').select('id').eq('id', ownProgram.id)
   check('...pero sí ve el de SU coach cuando el assignment lo alcanza', (ownRead ?? []).length === 1)
+
+  // --- 0005: los otros revokes de helpers (L-1) ---------------------------
+  for (const fn of ['my_position_id', 'my_system_group_id']) {
+    const { error } = await asPlayer.rpc(fn)
+    check(`authenticated no puede invocar ${fn}`, !!error, error ? '' : 'PUDO — falta el revoke')
+  }
+  const { error: ownsErr } = await asPlayer.rpc('owns_program', { target: ownProgram.id })
+  check('authenticated no puede invocar owns_program', !!ownsErr, ownsErr ? '' : 'PUDO — falta el revoke')
+
+  // --- 0006: destinos de assignment acotados al coach del programa (L-1) --
+  const { error: foreignPlayerTarget } = await admin
+    .from('program_assignments')
+    .insert({ program_id: foreignProgram.id, player_id: playerId })
+  check(
+    'un assignment no puede apuntar a un jugador de otro coach',
+    !!foreignPlayerTarget,
+    foreignPlayerTarget?.message?.slice(0, 60) ?? 'PUDO — falta el trigger de 0006',
+  )
+
+  const { data: foreignGroup } = await admin
+    .from('position_groups')
+    .insert({ coach_id: coach2Id, name: 'Grupo ajeno' })
+    .select('id')
+    .single()
+  createdGroups.push(foreignGroup.id)
+  const { error: foreignGroupTarget } = await admin
+    .from('program_assignments')
+    .insert({ program_id: ownProgram.id, position_group_id: foreignGroup.id })
+  check(
+    'un assignment no puede apuntar a un grupo de otro coach',
+    !!foreignGroupTarget,
+    foreignGroupTarget?.message?.slice(0, 60) ?? 'PUDO — falta el trigger de 0006',
+  )
+
+  const { error: ownPlayerTarget } = await admin
+    .from('program_assignments')
+    .insert({ program_id: ownProgram.id, player_id: playerId })
+  check('...pero sí a un jugador del plantel propio', !ownPlayerTarget, ownPlayerTarget?.message ?? '')
+
+  // --- 0006: desvinculación (M-1 de la re-auditoría) ----------------------
+  // Va AL FINAL: deja al jugador sin coach y eso cambia lo que ve por RLS.
+  const { error: selfUnlink } = await asPlayer.from('profiles').update({ coach_id: null }).eq('id', playerId)
+  check(
+    'un jugador NO puede auto-desvincularse',
+    !!selfUnlink,
+    selfUnlink?.message?.slice(0, 60) ?? 'PUDO — el trigger tiene que frenarlo',
+  )
+
+  const asCoach = createClient(URL, ANON, { auth: { persistSession: false } })
+  const { error: coachSignIn } = await asCoach.auth.signInWithPassword({
+    email: 'coach.test@coachlab.local',
+    password: 'TestPassw0rd!x9',
+  })
+  check('el coach puede iniciar sesión', !coachSignIn, coachSignIn?.message ?? '')
+
+  // Un PATCH directo NO alcanza, ni siquiera para el coach dueño: al poner
+  // coach_id=null la fila deja de ser visible bajo profiles_select y Postgres
+  // tira 42501. Por eso la operación va por RPC (migración 0007).
+  const { error: patchUnlink } = await asCoach.from('profiles').update({ coach_id: null }).eq('id', playerId)
+  check(
+    'ni el coach puede desvincular con un PATCH directo (va por RPC)',
+    !!patchUnlink,
+    patchUnlink?.message?.slice(0, 45) ?? 'PUDO — 0007 dejó el WITH CHECK abierto',
+  )
+
+  const asCoach2 = createClient(URL, ANON, { auth: { persistSession: false } })
+  await asCoach2.auth.signInWithPassword({
+    email: 'coach2.test@coachlab.local',
+    password: 'TestPassw0rd!x9',
+  })
+  const { error: foreignRelease } = await asCoach2.rpc('release_player', { player_id: playerId })
+  check(
+    'un coach no puede liberar al jugador de otro coach',
+    !!foreignRelease,
+    foreignRelease?.message?.slice(0, 45) ?? 'PUDO — agujero',
+  )
+
+  // Regalar un jugador propio a otro coach: falla por WITH CHECK + trigger.
+  const { error: giveAway } = await asCoach.from('profiles').update({ coach_id: coach2Id }).eq('id', playerId)
+  const { data: afterGive } = await admin.from('profiles').select('coach_id').eq('id', playerId).single()
+  check(
+    'un coach no puede regalar su jugador a otro coach',
+    !!giveAway && afterGive?.coach_id === coachId,
+    giveAway?.message?.slice(0, 45) ?? 'PUDO — agujero',
+  )
+
+  const { error: releaseErr } = await asCoach.rpc('release_player', { player_id: playerId })
+  check('release_player: el coach SÍ saca a un jugador de su plantel', !releaseErr, releaseErr?.message ?? '')
+
+  const { data: unlinked } = await admin.from('profiles').select('coach_id').eq('id', playerId).single()
+  check('la desvinculación dejó coach_id en null', unlinked?.coach_id === null, `coach_id=${unlinked?.coach_id}`)
+
+  const { error: reRelease } = await asCoach.rpc('release_player', { player_id: playerId })
+  check('release_player falla si el jugador ya no es del plantel', !!reRelease)
+
+  // Reclamar a un jugador sin coach con un PATCH. OJO: acá RLS filtra la fila
+  // por USING, y un UPDATE que no matchea filas devuelve ÉXITO con 0 filas
+  // afectadas. Por eso el check mira el DATO, no el error: "sin error" no
+  // significa "funcionó".
+  await asCoach.from('profiles').update({ coach_id: coachId }).eq('id', playerId)
+  const { data: afterClaim } = await admin.from('profiles').select('coach_id').eq('id', playerId).single()
+  check(
+    'un coach no puede reclamar a un jugador sin coach con un PATCH',
+    afterClaim?.coach_id === null,
+    `coach_id=${afterClaim?.coach_id}`,
+  )
 } finally {
-  // Los programas primero: programs.coach_id referencia profiles.
+  // Programas y grupos primero: los dos referencian profiles.
   if (createdPrograms.length > 0) {
     await admin.from('programs').delete().in('id', createdPrograms)
   }
+  if (createdGroups.length > 0) {
+    await admin.from('position_groups').delete().in('id', createdGroups)
+  }
   for (const id of created) await admin.auth.admin.deleteUser(id)
-  console.log(`\nlimpieza: ${createdPrograms.length} programas y ${created.length} usuarios de prueba borrados`)
+  console.log(
+    `\nlimpieza: ${createdPrograms.length} programas, ${createdGroups.length} grupos y ${created.length} usuarios de prueba borrados`,
+  )
   const failed = results.filter((r) => !r.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks OK`)
   process.exit(failed.length ? 1 : 0)

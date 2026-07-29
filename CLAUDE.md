@@ -169,6 +169,10 @@ where a.player_id = $playerId
 
 **"Última vez" (`lastPerf`)**: último `exercise_entry` del jugador para el mismo ejercicio (por `normalized_name`) en días anteriores, mostrando "Semana X · Día: NN kg · N reps · RPE N". En Postgres es un join con `ORDER BY completed_at DESC LIMIT 1`, no un filtrado en memoria.
 
+**Vínculo jugador↔coach**: nace en el signup (trigger `handle_new_user` con el invite code) y después solo cambia por **dos RPCs**, nunca por un PATCH: `redeem_invite_code(code)` (un jugador sin coach canjea un código — lo consume la pantalla de perfil de F3) y `release_player(player_id)` (el coach saca a un jugador de su plantel). `coach_id`, `email`, `role` e `invite_code` son inmutables desde la tabla: los frena el trigger `guard_profile_changes`. Además, un programa solo "alcanza" a un jugador si es de SU coach, y los destinos de un assignment tienen que pertenecer al coach del programa — los assignments no cruzan planteles. Migraciones `0005`–`0007`.
+
+> **Trampa de RLS que ya nos costó una tarde:** Postgres exige que la fila **resultante** de un `UPDATE` siga siendo visible bajo las políticas de `SELECT`. Un update que saca la fila del alcance de su propia política falla con `42501 new row violates row-level security policy` aunque el `WITH CHECK` pase y aunque no haya `RETURNING`. Por eso desvincular un jugador (`coach_id → null`, que lo vuelve invisible para su ex-coach) no puede hacerse con un PATCH y va por RPC `security definer`. Si aparece un 42501 inexplicable, esto es lo primero que hay que mirar.
+
 ---
 
 ## 4. RBAC — seguridad en 5 capas (TODAS obligatorias)
@@ -307,7 +311,7 @@ Marcar `[x]` al completar cada fase. Al iniciar sesión de trabajo, buscar la pr
 Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 
 - [x] **F0 — Setup**: monorepo pnpm, proyecto Supabase, schema completo con RLS, tipos generados, Hono con OpenAPI montado en Nitro, Nuxt SSR, funciones puras de dominio con tests, deploy a Vercel. → `docs/IMPLEMENTATION-F0.md`
-- [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (⚠ antes de F2: ejecutar `docs/superpowers/plans/2026-07-28-rbac-hardening.md`)
+- [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
 - [ ] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 3 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import Excel/texto**.
 - [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; keepalive de UptimeRobot; dominio propio si se quiere.
