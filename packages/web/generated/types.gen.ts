@@ -137,6 +137,34 @@ export type CreatedRow = {
     id: string;
 };
 
+export type Assignment = {
+    id: string;
+    kind: 'PLAYER' | 'POSITION_GROUP' | 'SYSTEM_GROUP' | 'POSITION';
+    targetName: string;
+    basePriority: number;
+    priority: number;
+    totalPriority: number;
+    createdAt: string;
+};
+
+export type AssignmentsResponse = {
+    ok: true;
+    assignments: Array<Assignment>;
+};
+
+export type AssignmentPreviewRow = {
+    playerId: string;
+    name: string;
+    positionId: string | null;
+    programId: string | null;
+    programName: string | null;
+};
+
+export type AssignmentPreviewResponse = {
+    ok: true;
+    rows: Array<AssignmentPreviewRow>;
+};
+
 export type AdminStatsResponse = {
     ok: true;
     stats: {
@@ -1109,6 +1137,135 @@ export type PatchApiCoachBlocksByBlockIdExercisesReorderResponses = {
 };
 
 export type PatchApiCoachBlocksByBlockIdExercisesReorderResponse = PatchApiCoachBlocksByBlockIdExercisesReorderResponses[keyof PatchApiCoachBlocksByBlockIdExercisesReorderResponses];
+
+export type GetApiCoachProgramsByProgramIdAssignmentsData = {
+    body?: never;
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}/assignments';
+};
+
+export type GetApiCoachProgramsByProgramIdAssignmentsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type GetApiCoachProgramsByProgramIdAssignmentsError = GetApiCoachProgramsByProgramIdAssignmentsErrors[keyof GetApiCoachProgramsByProgramIdAssignmentsErrors];
+
+export type GetApiCoachProgramsByProgramIdAssignmentsResponses = {
+    /**
+     * Asignaciones
+     */
+    200: AssignmentsResponse;
+};
+
+export type GetApiCoachProgramsByProgramIdAssignmentsResponse = GetApiCoachProgramsByProgramIdAssignmentsResponses[keyof GetApiCoachProgramsByProgramIdAssignmentsResponses];
+
+export type PostApiCoachProgramsByProgramIdAssignmentsData = {
+    body?: {
+        playerId?: string | null;
+        positionId?: string | null;
+        systemGroupId?: 'forwards' | 'backs';
+        positionGroupId?: string | null;
+        priority?: number;
+    };
+    path: {
+        programId: string;
+    };
+    query?: never;
+    url: '/api/coach/programs/{programId}/assignments';
+};
+
+export type PostApiCoachProgramsByProgramIdAssignmentsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachProgramsByProgramIdAssignmentsError = PostApiCoachProgramsByProgramIdAssignmentsErrors[keyof PostApiCoachProgramsByProgramIdAssignmentsErrors];
+
+export type PostApiCoachProgramsByProgramIdAssignmentsResponses = {
+    /**
+     * Creada
+     */
+    200: {
+        ok: true;
+        id: string;
+    };
+};
+
+export type PostApiCoachProgramsByProgramIdAssignmentsResponse = PostApiCoachProgramsByProgramIdAssignmentsResponses[keyof PostApiCoachProgramsByProgramIdAssignmentsResponses];
+
+export type DeleteApiCoachAssignmentsByAssignmentIdData = {
+    body?: never;
+    path: {
+        assignmentId: string;
+    };
+    query?: never;
+    url: '/api/coach/assignments/{assignmentId}';
+};
+
+export type DeleteApiCoachAssignmentsByAssignmentIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiCoachAssignmentsByAssignmentIdError = DeleteApiCoachAssignmentsByAssignmentIdErrors[keyof DeleteApiCoachAssignmentsByAssignmentIdErrors];
+
+export type DeleteApiCoachAssignmentsByAssignmentIdResponses = {
+    /**
+     * Borrada
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type DeleteApiCoachAssignmentsByAssignmentIdResponse = DeleteApiCoachAssignmentsByAssignmentIdResponses[keyof DeleteApiCoachAssignmentsByAssignmentIdResponses];
+
+export type GetApiCoachAssignmentsPreviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/assignments/preview';
+};
+
+export type GetApiCoachAssignmentsPreviewErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiCoachAssignmentsPreviewError = GetApiCoachAssignmentsPreviewErrors[keyof GetApiCoachAssignmentsPreviewErrors];
+
+export type GetApiCoachAssignmentsPreviewResponses = {
+    /**
+     * Impacto
+     */
+    200: AssignmentPreviewResponse;
+};
+
+export type GetApiCoachAssignmentsPreviewResponse = GetApiCoachAssignmentsPreviewResponses[keyof GetApiCoachAssignmentsPreviewResponses];
 
 export type GetApiAdminStatsData = {
     body?: never;

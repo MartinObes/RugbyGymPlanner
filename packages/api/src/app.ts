@@ -3,6 +3,7 @@ import { requireRole, withActor, type AuthVariables } from './middleware/auth'
 import { onError } from './middleware/error'
 import { admin } from './routes/admin'
 import { auth } from './routes/auth'
+import { assignments } from './routes/coach/assignments'
 import { groups } from './routes/coach/groups'
 import { players } from './routes/coach/players'
 import { programs } from './routes/coach/programs'
@@ -37,6 +38,7 @@ app.route('/', players)
 app.route('/', groups)
 app.route('/', programs)
 app.route('/', tree)
+app.route('/', assignments)
 app.route('/', admin)
 
 app.notFound((c) => c.json({ ok: false as const, error: 'No encontrado' }, 404))
