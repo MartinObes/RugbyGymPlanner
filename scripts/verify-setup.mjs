@@ -34,6 +34,7 @@ const check = (name, pass, detail = '') => {
 const created = []
 const createdPrograms = []
 const createdGroups = []
+const createdExercises = []
 async function makeUser(email, meta) {
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -328,6 +329,13 @@ try {
     email: 'coach.test@coachlab.local',
     password: 'TestPassw0rd!x9',
   })
+
+  // Sesión del segundo coach: es la que prueba el aislamiento entre planteles.
+  const asCoach2 = createClient(URL, ANON, { auth: { persistSession: false } })
+  await asCoach2.auth.signInWithPassword({
+    email: 'coach2.test@coachlab.local',
+    password: 'TestPassw0rd!x9',
+  })
   const { error: coachForeignTarget } = await asCoachEarly
     .from('program_assignments')
     .insert({ program_id: ownProgram.id, player_id: sneakyId })
@@ -366,6 +374,99 @@ try {
     .insert({ player_id: playerId, day_id: '00000000-0000-0000-0000-000000000000' })
   check('el coach NO puede escribir el log de un jugador', !!coachLogErr)
 
+  // --- F2: el árbol del programa y su scoping -----------------------------
+  //
+  // Estos checks usan sesiones reales de dos coaches distintos, que es lo único
+  // que prueba de verdad que RLS aísla los programas.
+  const { data: ownWeek } = await asCoachEarly
+    .from('weeks')
+    .insert({ program_id: ownProgram.id, name: 'Semana test', order_index: 1 })
+    .select('id')
+    .single()
+  check('el coach puede crear una semana en su programa', !!ownWeek)
+
+  const { error: foreignWeekErr } = await asCoach2
+    .from('weeks')
+    .insert({ program_id: ownProgram.id, name: 'Intruso', order_index: 9 })
+  check(
+    'otro coach NO puede agregar una semana a un programa ajeno',
+    !!foreignWeekErr,
+    foreignWeekErr?.message?.slice(0, 45) ?? 'PUDO — agujero',
+  )
+
+  const { data: foreignWeekRead } = await asCoach2.from('weeks').select('id').eq('id', ownWeek.id)
+  check('otro coach NO ve las semanas de un programa ajeno', (foreignWeekRead ?? []).length === 0)
+
+  // Un UPDATE ajeno no da error: da 0 filas. Por eso se mira el dato, y por eso
+  // las rutas de la API cierran con .select().maybeSingle() + assertRow.
+  await asCoach2.from('weeks').update({ name: 'Pisada' }).eq('id', ownWeek.id)
+  const { data: weekAfter } = await admin.from('weeks').select('name').eq('id', ownWeek.id).single()
+  check(
+    'un UPDATE de otro coach sobre una semana ajena no cambia nada',
+    weekAfter?.name === 'Semana test',
+    `name=${weekAfter?.name}`,
+  )
+
+  // El árbol entero se va en cascada al borrar el programa.
+  const { data: cascadeDay } = await admin
+    .from('days')
+    .insert({ week_id: ownWeek.id, name: 'Día cascada', order_index: 0 })
+    .select('id')
+    .single()
+  const { data: cascadeBlock } = await admin
+    .from('blocks')
+    .insert({ day_id: cascadeDay.id, type: 'SINGLE', order_index: 0 })
+    .select('id')
+    .single()
+  check('se puede crear un bloque SINGLE sin vueltas', !!cascadeBlock)
+
+  const { error: badBlockErr } = await admin
+    .from('blocks')
+    .insert({ day_id: cascadeDay.id, type: 'SINGLE', rounds: 3, order_index: 1 })
+  check('0008: un bloque SINGLE con vueltas lo rechaza el CHECK', !!badBlockErr)
+
+  const { error: badCircuitErr } = await admin
+    .from('blocks')
+    .insert({ day_id: cascadeDay.id, type: 'CIRCUIT', order_index: 2 })
+  check('0008: un CIRCUIT sin vueltas lo rechaza el CHECK', !!badCircuitErr)
+
+  const { error: badLoadErr } = await admin.from('block_exercises').insert({
+    block_id: cascadeBlock.id,
+    exercise_id: anExercise.id,
+    load_type: 'PERCENTAGE',
+    weight: 100,
+    sets: 3,
+    reps: '5',
+  })
+  check('0001: PERCENTAGE con kg fijos lo rechaza el CHECK', !!badLoadErr)
+
+  // --- F2: ensure_exercise (0008) -----------------------------------------
+  const { data: ensuredId, error: ensureErr } = await asCoachEarly.rpc('ensure_exercise', {
+    p_name: 'Remo Pendlay Test',
+    p_normalized: 'remo pendlay test',
+  })
+  check('un coach puede agregar un ejercicio al catálogo con ensure_exercise', !!ensuredId && !ensureErr, ensureErr?.message ?? '')
+
+  const { data: ensuredAgain } = await asCoachEarly.rpc('ensure_exercise', {
+    p_name: 'Remo Pendlay Test',
+    p_normalized: 'remo pendlay test',
+  })
+  check('ensure_exercise es idempotente: devuelve el mismo id', ensuredAgain === ensuredId)
+
+  // ...pero NO puede pisar ni borrar el catálogo (exercises_write sigue ADMIN).
+  const { error: catalogUpdateErr } = await asCoachEarly
+    .from('exercises')
+    .update({ name: 'Pisado' })
+    .eq('id', anExercise.id)
+  const { data: catalogAfter } = await admin.from('exercises').select('name').eq('id', anExercise.id).single()
+  check(
+    'un coach NO puede renombrar un ejercicio del catálogo',
+    catalogAfter?.name !== 'Pisado',
+    catalogUpdateErr ? '' : `sin error, name=${catalogAfter?.name}`,
+  )
+
+  if (ensuredId) createdExercises.push(ensuredId)
+
   // --- 0006: desvinculación (M-1 de la re-auditoría) ----------------------
   // Va AL FINAL: deja al jugador sin coach y eso cambia lo que ve por RLS.
   const { error: selfUnlink } = await asPlayer.from('profiles').update({ coach_id: null }).eq('id', playerId)
@@ -395,11 +496,6 @@ try {
     patchUnlink?.message?.slice(0, 45) ?? 'PUDO — 0007 dejó el WITH CHECK abierto',
   )
 
-  const asCoach2 = createClient(URL, ANON, { auth: { persistSession: false } })
-  await asCoach2.auth.signInWithPassword({
-    email: 'coach2.test@coachlab.local',
-    password: 'TestPassw0rd!x9',
-  })
   const { error: foreignRelease } = await asCoach2.rpc('release_player', { player_id: playerId })
   check(
     'un coach no puede liberar al jugador de otro coach',
@@ -457,9 +553,14 @@ try {
   if (createdGroups.length > 0) {
     await admin.from('position_groups').delete().in('id', createdGroups)
   }
+  // Los ejercicios van después de los programas: block_exercises los referencia
+  // con ON DELETE RESTRICT.
+  if (createdExercises.length > 0) {
+    await admin.from('exercises').delete().in('id', createdExercises)
+  }
   for (const id of created) await admin.auth.admin.deleteUser(id)
   console.log(
-    `\nlimpieza: ${createdPrograms.length} programas, ${createdGroups.length} grupos y ${created.length} usuarios de prueba borrados`,
+    `\nlimpieza: ${createdPrograms.length} programas, ${createdGroups.length} grupos, ${createdExercises.length} ejercicios y ${created.length} usuarios de prueba borrados`,
   )
   const failed = results.filter((r) => !r.pass)
   console.log(`\n${results.length - failed.length}/${results.length} checks OK`)
