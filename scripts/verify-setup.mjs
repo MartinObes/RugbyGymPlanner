@@ -453,6 +453,106 @@ try {
   })
   check('0001: PERCENTAGE con kg fijos lo rechaza el CHECK', !!badLoadErr)
 
+  // --- F3/0015: session_logs con el día scopeado --------------------------
+  //
+  // session_logs_write (0003) era solo `player_id = auth.uid()`: correcto sobre
+  // DE QUIÉN es el log, mudo sobre CONTRA QUÉ se registra. Un jugador reasignado
+  // seguía pudiendo escribir contra los días del programa viejo.
+  //
+  // cascadeDay es un día de ownProgram, que alcanza al jugador (assignment a
+  // 'backs' + su position_id = 'wing'). El día ajeno se arma sobre
+  // foreignProgram, que es del otro coach.
+  const { data: foreignWeek2 } = await admin
+    .from('weeks')
+    .insert({ program_id: foreignProgram.id, name: 'Semana ajena', order_index: 0 })
+    .select('id')
+    .single()
+  const { data: foreignDay } = await admin
+    .from('days')
+    .insert({ week_id: foreignWeek2.id, name: 'Día ajeno', order_index: 0 })
+    .select('id')
+    .single()
+
+  const { error: foreignLogErr } = await asPlayer
+    .from('session_logs')
+    .insert({ player_id: playerId, day_id: foreignDay.id })
+  check(
+    '0015: session_logs rechaza un day_id de otro programa',
+    // Se mira el CÓDIGO: un 23503 sería la FK, no la política.
+    foreignLogErr?.code === '42501',
+    foreignLogErr ? `${foreignLogErr.code}` : 'PUDO — agujero abierto',
+  )
+
+  const { error: ownLogErr } = await asPlayer
+    .from('session_logs')
+    .upsert({ player_id: playerId, day_id: cascadeDay.id }, { onConflict: 'player_id,day_id' })
+  check(
+    '0015: session_logs acepta un día del programa propio',
+    !ownLogErr,
+    ownLogErr?.message?.slice(0, 50) ?? '',
+  )
+
+  const { error: ghostLogErr } = await asPlayer
+    .from('session_logs')
+    .insert({ player_id: playerId, day_id: '00000000-0000-0000-0000-000000000000' })
+  check(
+    '0015: session_logs rechaza un day_id inexistente',
+    !!ghostLogErr,
+    ghostLogErr?.code ?? 'PUDO',
+  )
+
+  // --- F3: cambio de la contraseña propia ---------------------------------
+  //
+  // Usuario dedicado: cambiarle la contraseña al jugador de arriba rompería los
+  // checks que siguen usando su sesión.
+  //
+  // Lo que importa es el DATO, no el error: después de un intento fallido la
+  // contraseña vieja tiene que seguir sirviendo.
+  const pwdEmail = 'pwd.test@coachlab.local'
+  await makeUser(pwdEmail, { name: 'Cambio Clave', role: 'PLAYER' })
+  const OLD_PWD = 'TestPassw0rd!x9'
+  const NEW_PWD = 'NuevaPassw0rd!x9'
+
+  // Instancia nueva por cada login: un cliente que ya se autenticó guarda la
+  // sesión y daría falsos positivos (la trampa de IMPLEMENTATION-F2.md §4.2).
+  const freshClient = () => createClient(URL, ANON, { auth: { persistSession: false } })
+
+  const asPwdUser = freshClient()
+  await asPwdUser.auth.signInWithPassword({ email: pwdEmail, password: OLD_PWD })
+
+  const { error: changeErr } = await asPwdUser.auth.updateUser({ password: NEW_PWD })
+  check(
+    'F3: el usuario puede cambiar su propia contraseña',
+    !changeErr,
+    changeErr?.message?.slice(0, 50) ?? '',
+  )
+
+  const { error: withNewErr } = await freshClient().auth.signInWithPassword({
+    email: pwdEmail,
+    password: NEW_PWD,
+  })
+  check('F3: la contraseña nueva sirve para entrar', !withNewErr, withNewErr?.message ?? '')
+
+  const { error: withOldErr } = await freshClient().auth.signInWithPassword({
+    email: pwdEmail,
+    password: OLD_PWD,
+  })
+  check(
+    'F3: la contraseña vieja dejó de servir',
+    !!withOldErr,
+    withOldErr ? '' : 'la vieja sigue entrando',
+  )
+
+  // Un anónimo NO puede cambiarle la contraseña a nadie: updateUser sin sesión
+  // no tiene a quién aplicar. Es lo que hace que el flujo del cliente sea seguro
+  // sin una ruta en la API.
+  const { error: anonUpdateErr } = await freshClient().auth.updateUser({ password: 'Cualquiera123' })
+  check(
+    'F3: sin sesión no se puede cambiar ninguna contraseña',
+    !!anonUpdateErr,
+    anonUpdateErr ? '' : 'PUDO — agujero',
+  )
+
   // --- F2: ensure_exercise (0008) -----------------------------------------
   const { data: ensuredId, error: ensureErr } = await asCoachEarly.rpc('ensure_exercise', {
     p_name: 'Remo Pendlay Test',
