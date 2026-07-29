@@ -129,7 +129,10 @@ programs.openapi(
     const { data, error } = await c
       .get('db')
       .from('programs')
-      .select('id, name, current_week_id, updated_at, weeks(id), program_assignments(id)')
+      // `weeks!weeks_program_id_fkey`: hay DOS relaciones entre programs y weeks
+      // (weeks.program_id y programs.current_week_id), y sin desambiguar
+      // PostgREST responde "more than one relationship was found".
+      .select('id, name, current_week_id, updated_at, weeks!weeks_program_id_fkey(id), program_assignments(id)')
       .eq('coach_id', actor.id)
       .order('updated_at', { ascending: false })
     if (error) throw new Error(error.message)
@@ -232,9 +235,11 @@ programs.openapi(
     const { data, error } = await c
       .get('db')
       .from('programs')
+      // `weeks!weeks_program_id_fkey` desambigua: programs↔weeks tiene dos FK
+      // (weeks.program_id y programs.current_week_id) y PostgREST no elige sola.
       .select(
         `id, name, current_week_id,
-         weeks(id, name, order_index,
+         weeks!weeks_program_id_fkey(id, name, order_index,
            days(id, name, order_index,
              blocks(id, type, rounds, order_index,
                block_exercises(id, exercise_id, load_type, weight, percentage,
