@@ -10,9 +10,25 @@ const toast = useToast()
 const note = ref(props.day.note ?? '')
 const busy = ref(false)
 
+/**
+ * Las filas del día, para poder vaciar su autosave antes de cerrar.
+ *
+ * `v-for` con `ref` junta las instancias en un array, y el orden no importa: se
+ * vacían todas.
+ */
+type Flushable = { flush: () => Promise<void> }
+const rows = ref<Flushable[]>([])
+
+async function flushRows() {
+  await Promise.all(rows.value.filter(Boolean).map((row) => row.flush()))
+}
+
 async function complete() {
   busy.value = true
   try {
+    // Antes del POST, no después: el debounce de 800 ms del autosave llegaría a
+    // un día ya cerrado y la ruta lo rechazaría con 409.
+    await flushRows()
     await api.post(`/api/player/days/${props.day.id}/complete`, { note: note.value || null })
     toast.add({ title: 'Día completado', description: 'Tu entrenador ya lo puede ver.' })
     emit('changed')
@@ -66,6 +82,7 @@ async function reopen() {
       </p>
       <PlayerExerciseRow
         v-for="exercise in block.exercises"
+        ref="rows"
         :key="exercise.id"
         :exercise="exercise"
         :day-id="day.id"

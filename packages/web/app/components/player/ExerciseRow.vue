@@ -24,7 +24,7 @@ const reps = ref<number | null>(props.exercise.entry?.reps ?? null)
 // lo que "sin RPE" llega igual a la base como null.
 const rpe = ref<number | undefined>(props.exercise.entry?.rpe ?? undefined)
 
-const { trigger, state, error } = useDebouncedSave(async () => {
+const { trigger, flush, state, error } = useDebouncedSave(async () => {
   await api.put(`/api/player/days/${props.dayId}/entries/${props.exercise.id}`, {
     weight: weight.value,
     reps: reps.value,
@@ -33,6 +33,10 @@ const { trigger, state, error } = useDebouncedSave(async () => {
 })
 
 const RPE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+// El padre llama a esto antes de cerrar el día: sin vaciar el pendiente, el PUT
+// de la última tecla llega a un día ya cerrado y vuelve 409.
+defineExpose({ flush })
 
 const loadClass = computed(() =>
   props.exercise.load.kind === 'missing-1rm'
