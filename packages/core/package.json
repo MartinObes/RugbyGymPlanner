@@ -6,7 +6,8 @@
   "exports": {
     "./domain/*": "./src/domain/*.ts",
     "./validators/*": "./src/validators/*.ts",
-    "./access/*": "./src/access/*.ts"
+    "./access/*": "./src/access/*.ts",
+    "./types/*": "./src/types/*.ts"
   },
   "scripts": {
     "lint": "echo \"(sin linter propio: core y api son TS puro y los cubre typecheck)\"",

@@ -5,7 +5,7 @@ import {
   serializeCookieHeader,
 } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '~~/types/database'
+import type { Database } from '@coachlab/core/types/database'
 
 /**
  * Un cliente de Supabase por contexto: browser client en el navegador (guarda
