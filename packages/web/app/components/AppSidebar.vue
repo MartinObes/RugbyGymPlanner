@@ -47,8 +47,28 @@ const ACTIVE_TABBAR = 'text-primary'
     <aside
       class="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-default bg-default p-4 md:flex"
     >
+      <!--
+        El escudo es la marca del shell: reemplaza al texto "CoachLab".
+
+        SIN `fixed`: el aside ya es `fixed inset-y-0 left-0`, así que el escudo va
+        en su flujo normal y hereda el `p-4` del aside como margen. Con `fixed` se
+        anclaba al viewport y salía disparado a la esquina de la pantalla en vez de
+        quedarse acá adentro.
+
+        Lleva `alt` de verdad y no `aria-hidden`: acá el escudo ES el nombre de la
+        app, así que un lector de pantalla tiene que poder leerlo.
+      -->
       <div class="flex items-center justify-between">
-        <span class="text-lg font-bold">CoachLab</span>
+        <img
+          src="/escudo-light.png"
+          alt="CoachLab"
+          class="w-10 dark:hidden"
+        >
+        <img
+          src="/escudo-dark.png"
+          alt="CoachLab"
+          class="hidden w-10 dark:block"
+        >
         <ColorModeToggle />
       </div>
 
