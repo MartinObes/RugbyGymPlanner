@@ -11,6 +11,7 @@ import { players } from './routes/coach/players'
 import { programs } from './routes/coach/programs'
 import { tree } from './routes/coach/tree'
 import { health } from './routes/health'
+import { playerEvaluations } from './routes/player/evaluations'
 import { playerProfile } from './routes/player/profile'
 import { playerWeek } from './routes/player/week'
 
@@ -50,6 +51,7 @@ app.route('/', assignments)
 app.route('/', programImport)
 app.route('/', playerWeek)
 app.route('/', playerProfile)
+app.route('/', playerEvaluations)
 app.route('/', catalog)
 app.route('/', admin)
 
