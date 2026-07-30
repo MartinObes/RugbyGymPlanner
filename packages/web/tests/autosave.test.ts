@@ -20,20 +20,25 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '
 const read = (relative: string) => readFileSync(join(ROOT, relative), 'utf8')
 
 describe('el cierre del día vacía el autosave pendiente', () => {
-  it('la fila del ejercicio expone flush', () => {
-    const source = read('app/components/player/ExerciseRow.vue')
+  it('el control de registro expone flush', () => {
+    const source = read('app/components/player/LogSlideover.vue')
     expect(source).toContain('useDebouncedSave')
-    expect(source, 'sin defineExpose el padre no puede vaciar el pendiente').toContain(
-      'defineExpose',
-    )
     expect(source).toMatch(/defineExpose\(\{[^}]*flush/s)
   })
 
-  it('quien cierra el día espera el flush antes del complete', () => {
-    const source = read('app/components/player/DayCard.vue')
+  it('la cadena de flush llega desde la fila hasta el bloque', () => {
+    // La página junta los bloques, el bloque sus filas, y la fila su slideover.
+    // Si un eslabón no reexpone flush, el vaciado no llega y el 409 vuelve.
+    expect(read('app/components/player/ExerciseLine.vue')).toMatch(/defineExpose\([\s\S]*flush/)
+    expect(read('app/components/player/BlockSection.vue')).toMatch(/defineExpose\([\s\S]*flush/)
+  })
+
+  it('la página del día espera el flush antes del complete', () => {
+    const source = read('app/pages/player/week/[dayId].vue')
     const complete = source.indexOf('/complete')
     expect(complete, 'no se encontró la llamada a /complete').toBeGreaterThan(0)
-    const before = source.slice(0, complete)
-    expect(before, 'el flush tiene que ir ANTES del POST de complete').toMatch(/await[\s\S]*flush/)
+    expect(source.slice(0, complete), 'el flush tiene que ir ANTES del POST').toMatch(
+      /await[\s\S]*flush/,
+    )
   })
 })
