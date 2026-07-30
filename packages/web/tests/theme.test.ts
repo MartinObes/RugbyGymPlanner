@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -78,5 +78,21 @@ describe('el modo oscuro sobrescribe las superficies', () => {
     for (const variable of ['--ui-bg', '--ui-bg-muted', '--ui-border', '--ui-text-muted']) {
       expect(css, `falta ${variable} en el bloque .dark`).toContain(`${variable}:`)
     }
+  })
+})
+
+describe('el escudo del club', () => {
+  it('los dos assets están en public/', () => {
+    // El nombre dice el MODO en el que se usa, no el color del arte:
+    // escudo-light.png es el de fondos claros (two-tone-light).
+    for (const file of ['public/escudo-light.png', 'public/escudo-dark.png']) {
+      expect(existsSync(join(ROOT, file)), `falta ${file}`).toBe(true)
+    }
+  })
+
+  it('el shell lo muestra en los dos modos', () => {
+    const layout = readFileSync(join(ROOT, 'app/layouts/default.vue'), 'utf8')
+    expect(layout).toContain('/escudo-light.png')
+    expect(layout).toContain('/escudo-dark.png')
   })
 })
