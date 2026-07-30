@@ -1,5 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@coachlab/core/types/database'
 import { oneRmSchema, playerProfileSchema } from '@coachlab/core/validators/player'
 import { firstOf } from '../../access/embedded'
 import type { AuthVariables } from '../../middleware/auth'
@@ -68,7 +69,7 @@ export const playerProfile = new OpenAPIHono<{ Variables: AuthVariables }>()
  * Recibe `db` y `playerId` en vez del contexto de Hono: así no depende de los
  * genéricos de OpenAPIHono, que son incómodos de nombrar y no aportan nada acá.
  */
-async function readProfile(db: SupabaseClient, playerId: string) {
+async function readProfile(db: SupabaseClient<Database>, playerId: string) {
   const { data, error } = await db
     .from('profiles')
     .select('id, email, name, position_id, height_cm, weight_kg, coach_id')
@@ -153,7 +154,11 @@ playerProfile.openapi(
     // Campo por campo desde el objeto ya validado, nunca un spread del body:
     // profiles vive en la misma tabla que el rol. Zod ya descartó lo que no es
     // del schema y guard_profile_changes lo frena en la base (tres capas, §4).
-    const patch: Record<string, unknown> = {}
+    //
+    // El tipo de Update de la tabla y no Record<string, unknown>: con el cliente
+    // tipado (F3.5) escribir una columna que no existe deja de compilar, así que
+    // un `patch.role = ...` de más ni siquiera llega a la base.
+    const patch: Database['public']['Tables']['profiles']['Update'] = {}
     if (input.name !== undefined) patch.name = input.name
     if (input.positionId !== undefined) patch.position_id = input.positionId ?? null
     if (input.heightCm !== undefined) patch.height_cm = input.heightCm ?? null

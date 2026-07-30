@@ -1,5 +1,6 @@
 import { createServerClient, type CookieMethodsServer } from '@supabase/ssr'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@coachlab/core/types/database'
 
 /**
  * CLAUDE.md §4, la regla que hace que RLS sirva de algo:
@@ -10,6 +11,11 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
  * donde esa key aparece es scripts/seed.ts, que corre a mano y fuera de un
  * request. Si alguna vez necesitás service_role dentro de una ruta, la respuesta
  * casi siempre es que falta una política de RLS, no que falta la key.
+ *
+ * Los tres clientes van tipados con `Database` (los tipos generados viven en
+ * @coachlab/core/types/database desde F3.5). Eso hace que PostgREST infiera bien
+ * la forma de los embeds —objeto para many-to-one, array para one-to-many— y es
+ * lo que permitió borrar el helper `firstOf`.
  */
 
 function requireEnv(name: string): string {
@@ -22,8 +28,8 @@ function requireEnv(name: string): string {
  * Cliente con la sesión del usuario. Todas sus queries viajan con el JWT, así
  * que `auth.uid()` resuelve dentro de las políticas y RLS filtra sola.
  */
-export function createUserClient(accessToken: string): SupabaseClient {
-  return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
+export function createUserClient(accessToken: string): SupabaseClient<Database> {
+  return createClient<Database>(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -33,8 +39,8 @@ export function createUserClient(accessToken: string): SupabaseClient {
  * Cliente anónimo. Sirve para lo previo al login y para el health check.
  * Sin sesión el rol es `anon`, que no tiene ninguna política: no ve nada.
  */
-export function createAnonClient(): SupabaseClient {
-  return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
+export function createAnonClient(): SupabaseClient<Database> {
+  return createClient<Database>(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }
@@ -45,8 +51,10 @@ export function createAnonClient(): SupabaseClient {
  * autenticadas: viaja con el JWT del usuario, así que auth.uid() resuelve en
  * las políticas y RLS filtra sola (CLAUDE.md §4).
  */
-export function createRequestClient(cookies: CookieMethodsServer): SupabaseClient {
-  return createServerClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
-    cookies,
-  })
+export function createRequestClient(cookies: CookieMethodsServer): SupabaseClient<Database> {
+  return createServerClient<Database>(
+    requireEnv('SUPABASE_URL'),
+    requireEnv('SUPABASE_ANON_KEY'),
+    { cookies },
+  )
 }

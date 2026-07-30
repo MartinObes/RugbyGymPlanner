@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@coachlab/core/types/database'
 import {
   buildPlayerDay,
   type LoggedEntry,
@@ -85,7 +86,7 @@ type EntryRow = {
  * service_role.
  */
 export async function playerWeekFor(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   player: { id: string; positionId: string | null },
 ): Promise<PlayerWeek | null> {
   const programId = await activeProgramIdFor(db, player)
@@ -138,7 +139,7 @@ export async function playerWeekFor(
 
 /** El árbol de la semana en un request. Ordenado por order_index explícito. */
 async function loadTree(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   weekId: string,
 ): Promise<{ id: string; name: string; blocks: PlannedBlock[] }[]> {
   const { data, error } = await db
@@ -179,7 +180,7 @@ async function loadTree(
   }))
 }
 
-async function loadOneRms(db: SupabaseClient, playerId: string): Promise<OneRmRecord[]> {
+async function loadOneRms(db: SupabaseClient<Database>, playerId: string): Promise<OneRmRecord[]> {
   const { data, error } = await db
     .from('one_rms')
     .select('kg, exercises(normalized_name)')
@@ -202,7 +203,7 @@ async function loadOneRms(db: SupabaseClient, playerId: string): Promise<OneRmRe
  * (CLAUDE.md §2: no optimizar prematuramente).
  */
 async function loadHistory(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   playerId: string,
 ): Promise<{
   records: PerfRecord[]
@@ -275,7 +276,7 @@ async function loadHistory(
 
 /** La nota que el jugador dejó en un día, para prellenar el textarea. */
 export async function dayNotesFor(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   playerId: string,
   dayIds: readonly string[],
 ): Promise<Map<string, string | null>> {

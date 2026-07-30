@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@coachlab/core/types/database'
 import { isPositionId, systemGroupForPosition } from '@coachlab/core/domain/positions'
 import {
   resolveProgram,
@@ -52,7 +53,7 @@ export const ASSIGNMENT_COLUMNS =
  * dejaría de estar protegida — por eso nunca se usa service_role en un request.
  */
 export async function candidateAssignmentsFor(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   player: { id: string; positionId: string | null },
 ): Promise<CandidateAssignment[]> {
   // El `.or()` de abajo se arma interpolando strings, así que el positionId
@@ -90,7 +91,7 @@ export async function candidateAssignmentsFor(
 }
 
 export async function activeProgramIdFor(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   player: { id: string; positionId: string | null },
 ): Promise<string | null> {
   return resolveProgram(await candidateAssignmentsFor(db, player))?.programId ?? null

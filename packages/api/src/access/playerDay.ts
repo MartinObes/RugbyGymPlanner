@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@coachlab/core/types/database'
 import { NotFoundError } from '@coachlab/core/access/rbac'
 import { assertRow } from '../routes/coach/_scope'
 import { activeProgramIdFor } from './assignments'
@@ -18,7 +19,7 @@ export type SessionLog = { id: string; completed_at: string | null }
  * Recurso ajeno → 404, nunca 403: no se revela existencia.
  */
 export async function assertOwnedDay(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   player: { id: string; positionId: string | null },
   dayId: string,
   blockExerciseId?: string,
@@ -60,7 +61,7 @@ export async function assertOwnedDay(
  * Bumpear updated_at es correcto acá: solo se llama desde escrituras.
  */
 export async function ensureSessionLog(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   playerId: string,
   dayId: string,
 ): Promise<SessionLog> {
