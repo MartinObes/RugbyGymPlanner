@@ -146,6 +146,7 @@ export const programImport = new OpenAPIHono<{ Variables: AuthVariables }>().ope
             .insert({
               day_id: createdDay.id,
               type: block.type,
+              name: block.name,
               rounds: block.type === 'CIRCUIT' ? block.rounds : null,
               order_index: blockIndex,
             })

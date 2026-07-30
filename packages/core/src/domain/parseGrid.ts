@@ -164,10 +164,13 @@ export function parseGrid(rows: Cell[][]): ParsedProgram {
     const blockKey = `${dayKey}::${blockName}::${rounds ?? ''}`
     let block = blockByKey.get(blockKey)
     if (!block) {
+      // El nombre de la columna "bloque" se usaba solo para agrupar y se
+      // descartaba; desde F3.5 se conserva (migración 0016). Vacío → null.
+      const name = blockName ? blockName.slice(0, 60) : null
       block =
         rounds !== null && rounds >= 1
-          ? { type: 'CIRCUIT', rounds: Math.trunc(rounds), exercises: [] }
-          : { type: 'SINGLE', rounds: null, exercises: [] }
+          ? { type: 'CIRCUIT', name, rounds: Math.trunc(rounds), exercises: [] }
+          : { type: 'SINGLE', name, rounds: null, exercises: [] }
       blockByKey.set(blockKey, block)
       day.blocks.push(block)
     }

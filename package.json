@@ -9,7 +9,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "db:push": "supabase db push",
-    "gen:types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public > packages/core/src/types/database.ts",
+    "gen:types": "node scripts/gen-types.mjs",
     "dump:openapi": "tsx scripts/dump-openapi.ts",
     "seed": "tsx scripts/seed.ts",
     "verify:setup": "node scripts/verify-setup.mjs",

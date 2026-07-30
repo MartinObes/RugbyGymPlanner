@@ -223,3 +223,37 @@ describe('parseCoachSheet', () => {
     }
   })
 })
+
+describe('el nombre del bloque', () => {
+  /**
+   * La columna B de la fila del bloque trae su nombre y el parser lo tenía en la
+   * mano desde F2, pero lo descartaba: los programas importados quedaban con
+   * bloques anónimos y la rutina no se podía leer como la planilla.
+   */
+  const grid = [
+    ['', '', 'kilos', 'repet', 'S'],
+    ['', 'SESION 1 - LUNES', '', '', ''],
+    ['bloque 1', 'CIRCUITO CALENTAMIENTO', '3 VUELTAS', '', ''],
+    ['', 'Lagartijas pronos', 'p.corp', '10', ''],
+    ['', 'C 1', '2 vueltas', '', ''],
+    ['', 'Pecho plano', '100', '6', ''],
+  ]
+
+  it('lo toma de la columna B, tal como lo escribió el coach', () => {
+    const program = parseCoachSheet(grid, 'Fuerza 1')
+    const blocks = program.weeks[0]!.days[0]!.blocks
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]!.name).toBe('CIRCUITO CALENTAMIENTO')
+    expect(blocks[1]!.name).toBe('C 1')
+  })
+
+  it('el bloque implícito, el que se abre sin fila de bloque, no tiene nombre', () => {
+    const noBlockRow = [
+      ['', '', 'kilos', 'repet'],
+      ['', 'SESION 1 - LUNES', '', ''],
+      ['', 'Pecho plano', '100', '6'],
+    ]
+    const program = parseCoachSheet(noBlockRow, 'Fuerza 1')
+    expect(program.weeks[0]!.days[0]!.blocks[0]!.name).toBeNull()
+  })
+})

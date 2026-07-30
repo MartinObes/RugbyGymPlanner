@@ -75,6 +75,7 @@ export type Database = {
         Row: {
           day_id: string
           id: string
+          name: string | null
           order_index: number
           rounds: number | null
           type: string
@@ -82,6 +83,7 @@ export type Database = {
         Insert: {
           day_id: string
           id?: string
+          name?: string | null
           order_index?: number
           rounds?: number | null
           type?: string
@@ -89,6 +91,7 @@ export type Database = {
         Update: {
           day_id?: string
           id?: string
+          name?: string | null
           order_index?: number
           rounds?: number | null
           type?: string

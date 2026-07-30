@@ -96,7 +96,7 @@ async function loadTree(
     .select(
       `id, name, order_index,
        blocks (
-         id, type, rounds, order_index,
+         id, type, name, rounds, order_index,
          block_exercises (
            id, load_type, weight, percentage, load_label, sets, reps, target_rpe, order_index,
            exercises ( name, normalized_name )
@@ -113,6 +113,7 @@ async function loadTree(
     blocks: sortByOrderIndex(day.blocks ?? []).map((block) => ({
       id: block.id,
       type: block.type === 'CIRCUIT' ? ('CIRCUIT' as const) : ('SINGLE' as const),
+      name: block.name,
       rounds: block.rounds,
       exercises: sortByOrderIndex(block.block_exercises ?? []).map((be) => ({
         id: be.id,

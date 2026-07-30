@@ -86,9 +86,12 @@ export function parseText(input: string): ParsedProgram {
       }
       const header = line.slice(1).trim()
       const rounds = ROUNDS_RE.exec(header)
+      // El encabezado del bloque es su nombre y se descartaba; desde F3.5 se
+      // conserva (migración 0016).
+      const name = header ? header.slice(0, 60) : null
       block = rounds
-        ? { type: 'CIRCUIT', rounds: Number(rounds[1]), exercises: [] }
-        : { type: 'SINGLE', rounds: null, exercises: [] }
+        ? { type: 'CIRCUIT', name, rounds: Number(rounds[1]), exercises: [] }
+        : { type: 'SINGLE', name, rounds: null, exercises: [] }
       day.blocks.push(block)
       return
     }
@@ -160,7 +163,8 @@ export function parseText(input: string): ParsedProgram {
       block = null
     }
     if (!block) {
-      block = { type: 'SINGLE', rounds: null, exercises: [] }
+      // Bloque implícito: ejercicios sin encabezado de bloque, sin nombre.
+      block = { type: 'SINGLE', name: null, rounds: null, exercises: [] }
       day.blocks.push(block)
     }
 

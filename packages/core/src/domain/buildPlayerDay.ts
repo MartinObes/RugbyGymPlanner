@@ -6,8 +6,7 @@ import { rmFor, type OneRmRecord } from './rmFor'
 /**
  * Un ejercicio del programa, como lo planificó el coach.
  *
- * No lleva `note`: `block_exercises` no tiene esa columna. Tampoco hay nombre de
- * bloque: `blocks` es (id, day_id, type, rounds, order_index).
+ * No lleva `note`: `block_exercises` no tiene esa columna.
  */
 export type PlannedExercise = {
   id: string
@@ -24,6 +23,8 @@ export type PlannedExercise = {
 export type PlannedBlock = {
   id: string
   type: 'SINGLE' | 'CIRCUIT'
+  /** El nombre de la planilla. Null en los bloques importados antes de F3.5. */
+  name: string | null
   rounds: number | null
   exercises: PlannedExercise[]
 }

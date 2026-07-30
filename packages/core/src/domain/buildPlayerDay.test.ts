@@ -9,6 +9,7 @@ function makeInput(): PlayerDayInput {
       blocks: [
         {
           id: 'b1',
+          name: null,
           type: 'SINGLE',
           rounds: null,
           exercises: [
@@ -38,6 +39,7 @@ function makeInput(): PlayerDayInput {
         },
         {
           id: 'b2',
+          name: null,
           type: 'CIRCUIT',
           rounds: 3,
           exercises: [

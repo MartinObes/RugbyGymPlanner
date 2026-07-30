@@ -47,6 +47,7 @@ const PlayerBlock = z
   .object({
     id: z.string(),
     type: z.enum(['SINGLE', 'CIRCUIT']),
+    name: z.string().nullable(),
     rounds: z.number().nullable(),
     exercises: z.array(PlayerExercise),
   })

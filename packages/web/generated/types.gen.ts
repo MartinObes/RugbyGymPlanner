@@ -200,6 +200,7 @@ export type PlayerExercise = {
 export type PlayerBlock = {
     id: string;
     type: 'SINGLE' | 'CIRCUIT';
+    name: string | null;
     rounds: number | null;
     exercises: Array<PlayerExercise>;
 };
@@ -1381,6 +1382,7 @@ export type PostApiCoachProgramsByProgramIdImportData = {
                 name: string;
                 blocks: Array<{
                     type: 'SINGLE' | 'CIRCUIT';
+                    name: string | null;
                     rounds: number | null;
                     exercises: Array<{
                         exerciseName: string;
