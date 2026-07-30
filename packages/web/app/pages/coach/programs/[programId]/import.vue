@@ -213,7 +213,7 @@ const loadOf = (exercise: {
       </template>
 
       <div v-if="tab === 'excel'" class="space-y-4">
-        <input type="file" accept=".xlsx,.xls" class="block w-full text-sm" @change="onFile" />
+        <input type="file" accept=".xlsx,.xls" class="block w-full text-sm" @change="onFile">
 
         <p v-if="reading" class="text-sm text-muted">Leyendo la planilla…</p>
 

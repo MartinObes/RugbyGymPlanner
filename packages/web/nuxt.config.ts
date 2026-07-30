@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   // correcto, sin flash de contenido ni spinner (CLAUDE.md §2).
   ssr: true,
 
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@nuxt/eslint'],
 
   // Obligatorio en Nuxt UI 3: sin esta hoja no se genera ninguna clase de
   // Tailwind y la app se sirve sin estilos.
