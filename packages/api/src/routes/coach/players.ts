@@ -1,6 +1,9 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
+import { evaluationSchema } from '@coachlab/core/validators/evaluation'
 import { oneRmSchema, playerProfileSchema } from '@coachlab/core/validators/player'
+import { assertMyPlayer, evaluationsFor } from '../../access/evaluations'
 import type { AuthVariables } from '../../middleware/auth'
+import { Evaluation } from '../player/evaluations'
 import { ErrorResponse } from '../schemas'
 import { assertRow, assertRpcOk } from './_scope'
 
@@ -335,5 +338,81 @@ players.openapi(
     assertRpcOk(error)
 
     return c.json({ ok: true as const }, 200)
+  },
+)
+
+// --- evaluaciones del plantel ------------------------------------------------
+
+const PlayerEvaluationsResponse = z
+  .object({ ok: z.literal(true), evaluations: z.array(Evaluation) })
+  .openapi('CoachPlayerEvaluationsResponse')
+
+players.openapi(
+  createRoute({
+    method: 'get',
+    path: '/coach/players/{playerId}/evaluations',
+    summary: 'Los tests de fuerza de un jugador de mi plantel',
+    request: { params: PlayerIdParam },
+    responses: {
+      200: {
+        description: 'Sus evaluaciones',
+        content: { 'application/json': { schema: PlayerEvaluationsResponse } },
+      },
+      ...errors,
+    },
+  }),
+  async (c) => {
+    const actor = c.get('actor')!
+    const { playerId } = c.req.valid('param')
+    const db = c.get('db')
+
+    await assertMyPlayer(db, actor.id, playerId)
+    return c.json({ ok: true as const, evaluations: await evaluationsFor(db, playerId) }, 200)
+  },
+)
+
+players.openapi(
+  createRoute({
+    method: 'post',
+    path: '/coach/players/{playerId}/evaluations',
+    summary: 'Cargar un test de un jugador de mi plantel',
+    request: {
+      params: PlayerIdParam,
+      body: { content: { 'application/json': { schema: evaluationSchema } } },
+    },
+    responses: {
+      200: {
+        description: 'Cargada, con el 1RM del jugador ya sincronizado',
+        content: { 'application/json': { schema: PlayerEvaluationsResponse } },
+      },
+      ...errors,
+    },
+  }),
+  async (c) => {
+    const actor = c.get('actor')!
+    const { playerId } = c.req.valid('param')
+    const input = c.req.valid('json')
+    const db = c.get('db')
+
+    // Pre-chequeo antes del insert: `evaluations_write` (0003) ya incluye
+    // is_my_player, así que RLS alcanzaría sola, pero sin esto un jugador ajeno
+    // devolvería un error de RLS como 500 en vez de un 404 (CLAUDE.md §4 capa 4).
+    await assertMyPlayer(db, actor.id, playerId)
+
+    // El 1RM del jugador lo sincroniza el trigger 0018, igual que por la ruta del
+    // jugador. Por eso la regla vive en la base y no acá.
+    const { data, error } = await db
+      .from('evaluations')
+      .insert({
+        player_id: playerId,
+        exercise_id: input.exerciseId,
+        kg: input.kg,
+        ...(input.testedOn ? { tested_on: input.testedOn } : {}),
+      })
+      .select('id')
+      .maybeSingle()
+    assertRow(data, error)
+
+    return c.json({ ok: true as const, evaluations: await evaluationsFor(db, playerId) }, 200)
   },
 )
