@@ -54,6 +54,19 @@ export type OkResponse = {
     ok: true;
 };
 
+export type Evaluation = {
+    id: string;
+    exerciseId: string;
+    exerciseName: string;
+    kg: number;
+    testedOn: string;
+};
+
+export type CoachPlayerEvaluationsResponse = {
+    ok: true;
+    evaluations: Array<Evaluation>;
+};
+
 export type Group = {
     id: string;
     name: string;
@@ -256,6 +269,33 @@ export type PlayerProfileResponse = {
 
 export type PlayerProfileOkResponse = {
     ok: true;
+};
+
+export type PlayerEvaluationsResponse = {
+    ok: true;
+    evaluations: Array<Evaluation>;
+};
+
+export type ExerciseTrend = {
+    exerciseId: string;
+    exerciseName: string;
+    latestKg: number | null;
+    latestTestedOn: string | null;
+    previousKg: number | null;
+    deltaKg: number | null;
+    direction: 'up' | 'down' | 'flat' | 'first' | 'none';
+};
+
+export type PlayerDashboardResponse = {
+    ok: true;
+    programName: string | null;
+    weekName: string | null;
+    progress: {
+        completed: number;
+        total: number;
+        ratio: number;
+    };
+    trends: Array<ExerciseTrend>;
 };
 
 export type Exercise = {
@@ -512,6 +552,72 @@ export type PostApiCoachPlayersByPlayerIdReleaseResponses = {
 };
 
 export type PostApiCoachPlayersByPlayerIdReleaseResponse = PostApiCoachPlayersByPlayerIdReleaseResponses[keyof PostApiCoachPlayersByPlayerIdReleaseResponses];
+
+export type GetApiCoachPlayersByPlayerIdEvaluationsData = {
+    body?: never;
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}/evaluations';
+};
+
+export type GetApiCoachPlayersByPlayerIdEvaluationsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type GetApiCoachPlayersByPlayerIdEvaluationsError = GetApiCoachPlayersByPlayerIdEvaluationsErrors[keyof GetApiCoachPlayersByPlayerIdEvaluationsErrors];
+
+export type GetApiCoachPlayersByPlayerIdEvaluationsResponses = {
+    /**
+     * Sus evaluaciones
+     */
+    200: CoachPlayerEvaluationsResponse;
+};
+
+export type GetApiCoachPlayersByPlayerIdEvaluationsResponse = GetApiCoachPlayersByPlayerIdEvaluationsResponses[keyof GetApiCoachPlayersByPlayerIdEvaluationsResponses];
+
+export type PostApiCoachPlayersByPlayerIdEvaluationsData = {
+    body?: {
+        exerciseId: string;
+        kg: number;
+        testedOn?: string;
+    };
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/players/{playerId}/evaluations';
+};
+
+export type PostApiCoachPlayersByPlayerIdEvaluationsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es de tu plantel
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiCoachPlayersByPlayerIdEvaluationsError = PostApiCoachPlayersByPlayerIdEvaluationsErrors[keyof PostApiCoachPlayersByPlayerIdEvaluationsErrors];
+
+export type PostApiCoachPlayersByPlayerIdEvaluationsResponses = {
+    /**
+     * Cargada, con el 1RM del jugador ya sincronizado
+     */
+    200: CoachPlayerEvaluationsResponse;
+};
+
+export type PostApiCoachPlayersByPlayerIdEvaluationsResponse = PostApiCoachPlayersByPlayerIdEvaluationsResponses[keyof PostApiCoachPlayersByPlayerIdEvaluationsResponses];
 
 export type GetApiCoachGroupsData = {
     body?: never;
@@ -1718,6 +1824,120 @@ export type PostApiPlayerRedeemInviteResponses = {
 };
 
 export type PostApiPlayerRedeemInviteResponse = PostApiPlayerRedeemInviteResponses[keyof PostApiPlayerRedeemInviteResponses];
+
+export type GetApiPlayerEvaluationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/player/evaluations';
+};
+
+export type GetApiPlayerEvaluationsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiPlayerEvaluationsError = GetApiPlayerEvaluationsErrors[keyof GetApiPlayerEvaluationsErrors];
+
+export type GetApiPlayerEvaluationsResponses = {
+    /**
+     * Mis evaluaciones
+     */
+    200: PlayerEvaluationsResponse;
+};
+
+export type GetApiPlayerEvaluationsResponse = GetApiPlayerEvaluationsResponses[keyof GetApiPlayerEvaluationsResponses];
+
+export type PostApiPlayerEvaluationsData = {
+    body?: {
+        exerciseId: string;
+        kg: number;
+        testedOn?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/player/evaluations';
+};
+
+export type PostApiPlayerEvaluationsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type PostApiPlayerEvaluationsError = PostApiPlayerEvaluationsErrors[keyof PostApiPlayerEvaluationsErrors];
+
+export type PostApiPlayerEvaluationsResponses = {
+    /**
+     * Cargada, con el 1RM ya sincronizado
+     */
+    200: PlayerEvaluationsResponse;
+};
+
+export type PostApiPlayerEvaluationsResponse = PostApiPlayerEvaluationsResponses[keyof PostApiPlayerEvaluationsResponses];
+
+export type DeleteApiPlayerEvaluationsByEvaluationIdData = {
+    body?: never;
+    path: {
+        evaluationId: string;
+    };
+    query?: never;
+    url: '/api/player/evaluations/{evaluationId}';
+};
+
+export type DeleteApiPlayerEvaluationsByEvaluationIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type DeleteApiPlayerEvaluationsByEvaluationIdError = DeleteApiPlayerEvaluationsByEvaluationIdErrors[keyof DeleteApiPlayerEvaluationsByEvaluationIdErrors];
+
+export type DeleteApiPlayerEvaluationsByEvaluationIdResponses = {
+    /**
+     * Borrada
+     */
+    200: PlayerEvaluationsResponse;
+};
+
+export type DeleteApiPlayerEvaluationsByEvaluationIdResponse = DeleteApiPlayerEvaluationsByEvaluationIdResponses[keyof DeleteApiPlayerEvaluationsByEvaluationIdResponses];
+
+export type GetApiPlayerDashboardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/player/dashboard';
+};
+
+export type GetApiPlayerDashboardErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiPlayerDashboardError = GetApiPlayerDashboardErrors[keyof GetApiPlayerDashboardErrors];
+
+export type GetApiPlayerDashboardResponses = {
+    /**
+     * El dashboard
+     */
+    200: PlayerDashboardResponse;
+};
+
+export type GetApiPlayerDashboardResponse = GetApiPlayerDashboardResponses[keyof GetApiPlayerDashboardResponses];
 
 export type GetApiCatalogExercisesData = {
     body?: never;
