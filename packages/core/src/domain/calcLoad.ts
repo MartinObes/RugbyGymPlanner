@@ -1,5 +1,21 @@
 export type LoadType = 'WEIGHT' | 'PERCENTAGE' | 'NONE' | 'LABEL'
 
+const LOAD_TYPES: readonly LoadType[] = ['WEIGHT', 'PERCENTAGE', 'NONE', 'LABEL']
+
+/**
+ * Guard para estrechar lo que viene de la base.
+ *
+ * `block_exercises.load_type` es `text` con un CHECK, no un enum de Postgres, así
+ * que los tipos generados lo dan como `string` y no como esta unión. Se estrecha
+ * con un guard y no con un `as` a propósito, igual que `isPositionId` con el slug
+ * del puesto (IMPLEMENTATION-F3.md §5.2): si algún día la base tuviera un valor
+ * que el código no conoce, cae en el default explícito de quien llama en vez de
+ * mentirle al type system y romper más adelante.
+ */
+export function isLoadType(value: string): value is LoadType {
+  return (LOAD_TYPES as readonly string[]).includes(value)
+}
+
 export type LoadSpec = {
   loadType: LoadType
   weight?: number | null

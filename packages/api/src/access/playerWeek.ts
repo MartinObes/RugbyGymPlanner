@@ -6,12 +6,11 @@ import {
   type PlannedBlock,
   type PlayerDay,
 } from '@coachlab/core/domain/buildPlayerDay'
-import type { LoadType } from '@coachlab/core/domain/calcLoad'
+import { isLoadType } from '@coachlab/core/domain/calcLoad'
 import type { PerfRecord } from '@coachlab/core/domain/lastPerf'
 import type { OneRmRecord } from '@coachlab/core/domain/rmFor'
 import { sortByOrderIndex } from '@coachlab/core/domain/tree'
 import { activeProgramIdFor } from './assignments'
-import { firstOf } from './embedded'
 
 export type PlayerWeek = {
   programId: string
@@ -22,61 +21,13 @@ export type PlayerWeek = {
   completedDayIds: string[]
 }
 
-type Named = { name: string; normalized_name: string }
-
-type ExerciseRow = {
-  id: string
-  load_type: LoadType
-  weight: number | null
-  percentage: number | null
-  load_label: string | null
-  sets: number | null
-  reps: string | null
-  target_rpe: number | null
-  order_index: number | null
-  exercises: Named | Named[] | null
-}
-
-type BlockRow = {
-  id: string
-  type: string
-  rounds: number | null
-  order_index: number | null
-  block_exercises: ExerciseRow[] | null
-}
-
-type DayRow = {
-  id: string
-  name: string
-  order_index: number | null
-  blocks: BlockRow[] | null
-}
-
-type WeekNamed = { name: string }
-type DayNamed = { name: string; weeks: WeekNamed | WeekNamed[] | null }
-
-type LogRow = {
-  id: string
-  day_id: string
-  note: string | null
-  completed_at: string | null
-  updated_at: string
-  days: DayNamed | DayNamed[] | null
-}
-
-type Normalized = { normalized_name: string }
-
-type EntryRow = {
-  session_log_id: string
-  block_exercise_id: string
-  weight: number | null
-  reps: number | null
-  rpe: number | null
-  block_exercises:
-    | { exercises: Normalized | Normalized[] | null }
-    | Array<{ exercises: Normalized | Normalized[] | null }>
-    | null
-}
+/*
+ * Los tipos de fila de este módulo (Named, ExerciseRow, BlockRow, DayRow,
+ * LogRow, EntryRow…) existían para describir a mano la ambigüedad de los embeds
+ * de PostgREST —objeto o array, según la cardinalidad, que el cliente sin tipar
+ * no sabía distinguir—. Con el cliente tipado con `Database` (F3.5) esa forma la
+ * infiere TS del schema, así que se borraron junto con el helper `firstOf`.
+ */
 
 /**
  * La semana vigente del jugador, lista para renderizar.
@@ -104,9 +55,7 @@ export async function playerWeekFor(
   if (programError) throw new Error(programError.message)
   if (!program) return null
 
-  const weeks = sortByOrderIndex(
-    (program.weeks ?? []) as { id: string; name: string; order_index: number | null }[],
-  )
+  const weeks = sortByOrderIndex(program.weeks ?? [])
   // La semana vigente es la del programa; si el coach no la fijó, la primera.
   const week = weeks.find((w) => w.id === program.current_week_id) ?? weeks[0]
   if (!week) return null
@@ -128,8 +77,8 @@ export async function playerWeekFor(
   )
 
   return {
-    programId: program.id as string,
-    programName: program.name as string,
+    programId: program.id,
+    programName: program.name,
     weekId: week.id,
     weekName: week.name,
     days,
@@ -158,7 +107,7 @@ async function loadTree(
   if (error) throw new Error(error.message)
 
   // CLAUDE.md §3: el orden NUNCA sale del orden en que vuelven las filas.
-  return sortByOrderIndex((data ?? []) as DayRow[]).map((day) => ({
+  return sortByOrderIndex(data ?? []).map((day) => ({
     id: day.id,
     name: day.name,
     blocks: sortByOrderIndex(day.blocks ?? []).map((block) => ({
@@ -167,10 +116,14 @@ async function loadTree(
       rounds: block.rounds,
       exercises: sortByOrderIndex(block.block_exercises ?? []).map((be) => ({
         id: be.id,
-        exerciseName: firstOf(be.exercises)?.name ?? 'Ejercicio',
+        exerciseName: be.exercises?.name ?? 'Ejercicio',
         sets: be.sets,
         reps: be.reps,
-        loadType: be.load_type,
+        // load_type es `text` con CHECK y no un enum de Postgres, así que los
+        // tipos generados lo dan como `string`. Se estrecha con el guard del
+        // dominio: un valor que el código no conoce cae en NONE (sin carga) en
+        // vez de romper el render.
+        loadType: isLoadType(be.load_type) ? be.load_type : 'NONE',
         weight: be.weight,
         percentage: be.percentage,
         loadLabel: be.load_label,
@@ -188,9 +141,8 @@ async function loadOneRms(db: SupabaseClient<Database>, playerId: string): Promi
   if (error) throw new Error(error.message)
 
   return (data ?? []).flatMap((row) => {
-    const normalizedName = firstOf(row.exercises as Normalized | Normalized[] | null)
-      ?.normalized_name
-    return normalizedName ? [{ normalizedName, kg: row.kg as number }] : []
+    const normalizedName = row.exercises?.normalized_name
+    return normalizedName ? [{ normalizedName, kg: row.kg }] : []
   })
 }
 
@@ -216,7 +168,7 @@ async function loadHistory(
     .eq('player_id', playerId)
   if (logsError) throw new Error(logsError.message)
 
-  const logRows = (logs ?? []) as LogRow[]
+  const logRows = logs ?? []
   if (logRows.length === 0) {
     return { records: [], entriesByDay: new Map(), completedDayIds: [] }
   }
@@ -236,7 +188,7 @@ async function loadHistory(
   const records: PerfRecord[] = []
   const entriesByDay = new Map<string, LoggedEntry[]>()
 
-  for (const row of (entries ?? []) as EntryRow[]) {
+  for (const row of entries ?? []) {
     const log = logById.get(row.session_log_id)
     if (!log) continue
 
@@ -250,14 +202,14 @@ async function loadHistory(
     if (forDay) forDay.push(entry)
     else entriesByDay.set(log.day_id, [entry])
 
-    const day = firstOf(log.days)
-    const normalizedName = firstOf(firstOf(row.block_exercises)?.exercises)?.normalized_name
+    const day = log.days
+    const normalizedName = row.block_exercises?.exercises?.normalized_name
     if (!day || !normalizedName) continue
 
     records.push({
       normalizedName,
       dayId: log.day_id,
-      weekName: firstOf(day.weeks)?.name ?? '',
+      weekName: day.weeks?.name ?? '',
       dayName: day.name,
       weight: row.weight,
       reps: row.reps,

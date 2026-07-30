@@ -2,7 +2,6 @@ import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@coachlab/core/types/database'
 import { oneRmSchema, playerProfileSchema } from '@coachlab/core/validators/player'
-import { firstOf } from '../../access/embedded'
 import type { AuthVariables } from '../../middleware/auth'
 import { assertRow, assertRpcOk } from '../coach/_scope'
 import { ErrorResponse } from '../schemas'
@@ -95,10 +94,10 @@ async function readProfile(db: SupabaseClient<Database>, playerId: string) {
   if (rmsError) throw new Error(rmsError.message)
 
   const oneRms = (rms ?? []).map((r) => ({
-    exerciseId: r.exercise_id as string,
-    exerciseName: firstOf(r.exercises as { name: string } | { name: string }[] | null)?.name ?? '—',
-    kg: r.kg as number,
-    updatedAt: r.updated_at as string,
+    exerciseId: r.exercise_id,
+    exerciseName: r.exercises?.name ?? '—',
+    kg: r.kg,
+    updatedAt: r.updated_at,
   }))
   oneRms.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 

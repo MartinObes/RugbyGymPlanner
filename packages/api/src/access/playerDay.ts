@@ -3,7 +3,6 @@ import type { Database } from '@coachlab/core/types/database'
 import { NotFoundError } from '@coachlab/core/access/rbac'
 import { assertRow } from '../routes/coach/_scope'
 import { activeProgramIdFor } from './assignments'
-import { firstOf } from './embedded'
 
 export type SessionLog = { id: string; completed_at: string | null }
 
@@ -34,8 +33,7 @@ export async function assertOwnedDay(
     .maybeSingle()
   const day = assertRow(dayRow, dayError)
 
-  const dayProgramId = firstOf(day.weeks as { program_id: string } | { program_id: string }[])
-    ?.program_id
+  const dayProgramId = day.weeks?.program_id
   if (dayProgramId !== programId) throw new NotFoundError()
 
   if (blockExerciseId === undefined) return
@@ -47,7 +45,7 @@ export async function assertOwnedDay(
     .maybeSingle()
   const blockExercise = assertRow(beRow, beError)
 
-  const beDayId = firstOf(blockExercise.blocks as { day_id: string } | { day_id: string }[])?.day_id
+  const beDayId = blockExercise.blocks?.day_id
   if (beDayId !== dayId) throw new NotFoundError()
 }
 
