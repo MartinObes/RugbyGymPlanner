@@ -22,6 +22,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { assertOwnedDay, ensureSessionLog } from '../packages/api/src/access/playerDay'
 import { playerWeekFor } from '../packages/api/src/access/playerWeek'
+import { evaluationsFor, trendsFrom } from '../packages/api/src/access/evaluations'
+import { playerDashboardFor } from '../packages/api/src/access/playerDashboard'
 
 const URL = process.env.SUPABASE_URL
 const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -120,7 +122,8 @@ async function main() {
     // Bloque SINGLE con una carga en % y una con etiqueta.
     const { data: single } = await admin
       .from('blocks')
-      .insert({ day_id: day.id, type: 'SINGLE', order_index: 0 })
+      // Con nombre (migración 0016) para que el check del árbol pruebe algo.
+      .insert({ day_id: day.id, type: 'SINGLE', name: 'Fuerza tren inferior', order_index: 0 })
       .select('id')
       .single()
     await admin.from('block_exercises').insert([
@@ -285,6 +288,82 @@ async function main() {
     'el ejercicio aparece en missingOneRms para el banner',
     week3!.days[0]!.missingOneRms.includes(pctExercise!.name),
     week3!.days[0]!.missingOneRms.join(', '),
+  )
+
+  // --- el dashboard -------------------------------------------------------
+  //
+  // Ejercita el select con `weeks!weeks_program_id_fkey`, que es el que en F2
+  // devolvía 500 por ambigüedad de FK y pasó el typecheck, los tests de rutas y
+  // verify:setup sin que nadie lo viera.
+  const dashboard = await playerDashboardFor(asPlayer, player)
+  check('el dashboard carga sin error de PostgREST', dashboard !== null)
+  check(
+    'el dashboard trae el nombre del programa asignado',
+    dashboard.programName !== null,
+    `programName=${dashboard.programName}`,
+  )
+  check(
+    'el progreso cuenta los días de la semana vigente',
+    dashboard.progress.total > 0,
+    `${dashboard.progress.completed}/${dashboard.progress.total}`,
+  )
+  check(
+    'el ratio del ring queda entre 0 y 1',
+    dashboard.progress.ratio >= 0 && dashboard.progress.ratio <= 1,
+    `ratio=${dashboard.progress.ratio}`,
+  )
+
+  // --- evaluaciones y la sincronización del 1RM ---------------------------
+  //
+  // Con la sesión del jugador, o sea con RLS aplicada: evaluations_write tiene que
+  // dejarlo escribir las suyas sin ningún cambio de política.
+  //
+  // Ojo con el orden: el bloque de arriba BORRÓ el 1RM de este ejercicio, así que
+  // este insert lo tiene que volver a crear. Eso hace el check más fuerte —
+  // prueba el upsert del trigger desde cero y no solo el update.
+  const { error: evalInsertError } = await asPlayer
+    .from('evaluations')
+    .insert({ player_id: player.id, exercise_id: pctExercise!.id, kg: 150, tested_on: '2026-07-20' })
+  check(
+    'el jugador puede cargar su propia evaluación con RLS puesta',
+    !evalInsertError,
+    evalInsertError?.message ?? '',
+  )
+
+  const evaluations = await evaluationsFor(asPlayer, player.id)
+  check('el select de evaluaciones con el embed de exercises no falla', evaluations.length > 0)
+  check(
+    'la evaluación trae el nombre del ejercicio del embed',
+    evaluations[0]?.exerciseName !== '—',
+    `exerciseName=${evaluations[0]?.exerciseName}`,
+  )
+
+  const trends = trendsFrom(evaluations)
+  check('las tendencias se agrupan por ejercicio', trends.length > 0)
+
+  const { data: syncedRm } = await asPlayer
+    .from('one_rms')
+    .select('kg')
+    .eq('player_id', player.id)
+    .eq('exercise_id', pctExercise!.id)
+    .maybeSingle()
+  check(
+    'el trigger 0018 sincronizó el 1RM con la evaluación cargada',
+    Number(syncedRm?.kg) === 150,
+    `kg=${syncedRm?.kg}`,
+  )
+
+  // --- que el nombre del bloque llegue hasta la vista ---------------------
+  const blocksWithName = week3!.days.flatMap((day) =>
+    day.blocks.filter((block) => block.name !== null),
+  )
+  check(
+    'el select del árbol trae blocks.name',
+    // Lo que importa es que la propiedad EXISTA en todos y que el bloque con
+    // nombre del fixture llegue con el suyo.
+    week3!.days.every((day) => day.blocks.every((block) => 'name' in block)) &&
+      blocksWithName.some((block) => block.name === 'Fuerza tren inferior'),
+    `${blocksWithName.length} bloques con nombre`,
   )
 }
 
