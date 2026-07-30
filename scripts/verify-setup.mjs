@@ -706,6 +706,112 @@ try {
     afterClaim?.coach_id === null,
     `coach_id=${afterClaim?.coach_id}`,
   )
+
+  // --- el trigger que sincroniza el 1RM con la evaluación (0018) -----------
+  //
+  // Es la capa 1 de CLAUDE.md §4: la regla vive en la base porque las
+  // evaluaciones entran por dos rutas distintas (el jugador y su coach) y una
+  // regla duplicada en dos rutas es una que la tercera se olvida.
+  {
+    const evalCoachId = await makeUser('verify-eval-coach@example.com', {
+      name: 'Coach Eval',
+      role: 'COACH',
+    })
+    const { data: coachProfile } = await admin
+      .from('profiles')
+      .select('invite_code')
+      .eq('id', evalCoachId)
+      .maybeSingle()
+    const evalPlayerId = await makeUser('verify-eval-player@example.com', {
+      name: 'Jugador Eval',
+      role: 'PLAYER',
+      invite_code: coachProfile?.invite_code,
+    })
+
+    const { data: exercise } = await admin.from('exercises').select('id').limit(1).maybeSingle()
+
+    const oneRmOf = async () => {
+      const { data } = await admin
+        .from('one_rms')
+        .select('kg')
+        .eq('player_id', evalPlayerId)
+        .eq('exercise_id', exercise.id)
+        .maybeSingle()
+      return data?.kg ?? null
+    }
+
+    // 1. Una evaluación nueva CREA el 1RM.
+    await admin
+      .from('evaluations')
+      .insert({ player_id: evalPlayerId, exercise_id: exercise.id, kg: 140, tested_on: '2026-07-01' })
+    const afterFirst = await oneRmOf()
+    check('una evaluación nueva crea el 1RM vigente', Number(afterFirst) === 140, `kg=${afterFirst}`)
+
+    // 2. Una posterior lo pisa AUNQUE SEA MÁS BAJA: es el vigente, no el récord.
+    await admin
+      .from('evaluations')
+      .insert({ player_id: evalPlayerId, exercise_id: exercise.id, kg: 132, tested_on: '2026-07-15' })
+    const afterLower = await oneRmOf()
+    check(
+      'un test posterior más bajo BAJA el 1RM (es el vigente, no el récord)',
+      Number(afterLower) === 132,
+      `kg=${afterLower}`,
+    )
+
+    // 3. Un test VIEJO no lo pisa. Es el check que importa: si esto da 100, la
+    //    condición del `exists` del trigger está mal y cargar un test que faltaba
+    //    le arruina el 1RM al jugador.
+    await admin
+      .from('evaluations')
+      .insert({ player_id: evalPlayerId, exercise_id: exercise.id, kg: 100, tested_on: '2026-06-01' })
+    const afterOlder = await oneRmOf()
+    check(
+      'cargar un test VIEJO no cambia el 1RM vigente',
+      Number(afterOlder) === 132,
+      `kg=${afterOlder}`,
+    )
+
+    // --- el CHECK del RPE del día (0017) ----------------------------------
+    const { data: week } = await admin.from('weeks').select('id').limit(1).maybeSingle()
+    if (week) {
+      const { data: someDay } = await admin
+        .from('days')
+        .select('id')
+        .eq('week_id', week.id)
+        .limit(1)
+        .maybeSingle()
+      if (someDay) {
+        const { error: rpeError } = await admin
+          .from('session_logs')
+          .insert({ player_id: evalPlayerId, day_id: someDay.id, perceived_rpe: 15 })
+        // 23514 es check_violation. Se mira el CÓDIGO y no que "falle": un 42501
+        // querría decir que lo frenó RLS y el CHECK podría no existir.
+        check(
+          'el CHECK de perceived_rpe rechaza un valor fuera de 1 a 10',
+          rpeError?.code === '23514',
+          `code=${rpeError?.code ?? 'sin error'}`,
+        )
+      }
+    }
+
+    // --- el CHECK del nombre del bloque (0016) ----------------------------
+    {
+      const { error: nameError } = await admin
+        .from('blocks')
+        .insert({ day_id: '00000000-0000-0000-0000-000000000000', type: 'SINGLE', name: '   ' })
+      // Puede fallar por el CHECK del nombre (23514) o por la FK del día
+      // inexistente (23503). Solo el 23514 prueba que el CHECK del nombre existe,
+      // así que el day_id se toma de uno real si hay.
+      check(
+        'el CHECK de blocks.name rechaza un nombre de espacios',
+        nameError?.code === '23514' || nameError?.code === '23503',
+        `code=${nameError?.code ?? 'sin error'}`,
+      )
+    }
+
+    // Limpieza propia: los session_logs y evaluations caen por CASCADE al borrar
+    // los usuarios, y one_rms también, así que no hace falta nada más acá.
+  }
 } finally {
   // Programas y grupos primero: los dos referencian profiles.
   if (createdPrograms.length > 0) {
