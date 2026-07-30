@@ -3,7 +3,20 @@ import type { SessionUser } from '@coachlab/core/validators/auth'
 
 const { user, logout } = useAuth()
 
-type NavItem = { to: string; label: string; icon: string }
+type NavItem = {
+  to: string
+  label: string
+  icon: string
+  /**
+   * Marcar activo SOLO en esta ruta exacta.
+   *
+   * `active-class` de NuxtLink matchea por prefijo, así que "Inicio" (`/player`)
+   * quedaría resaltado también en `/player/week` y `/player/profile` — o sea
+   * siempre, y dos ítems resaltados a la vez. Los que son prefijo de otros
+   * llevan esto.
+   */
+  exact?: true
+}
 
 // Solo páginas que existen.
 const NAV: Record<SessionUser['role'], NavItem[]> = {
@@ -13,6 +26,7 @@ const NAV: Record<SessionUser['role'], NavItem[]> = {
     { to: '/coach/programs', label: 'Programas', icon: 'i-lucide-clipboard-list' },
   ],
   PLAYER: [
+    { to: '/player', label: 'Inicio', icon: 'i-lucide-house', exact: true },
     { to: '/player/week', label: 'Mi semana', icon: 'i-lucide-calendar-days' },
     { to: '/player/profile', label: 'Mi perfil', icon: 'i-lucide-user' },
   ],
@@ -20,6 +34,11 @@ const NAV: Record<SessionUser['role'], NavItem[]> = {
 }
 
 const items = computed(() => (user.value ? NAV[user.value.role] : []))
+
+// El resaltado va por `active-class` (prefijo) o por `exact-active-class` según
+// el ítem; se define una vez para que las dos navs no se desincronicen.
+const ACTIVE_SIDEBAR = 'bg-elevated font-medium text-primary'
+const ACTIVE_TABBAR = 'text-primary'
 </script>
 
 <template>
@@ -39,7 +58,8 @@ const items = computed(() => (user.value ? NAV[user.value.role] : []))
           :key="item.to"
           :to="item.to"
           class="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-elevated"
-          active-class="bg-elevated font-medium text-primary"
+          :active-class="item.exact ? '' : ACTIVE_SIDEBAR"
+          :exact-active-class="item.exact ? ACTIVE_SIDEBAR : ''"
         >
           <UIcon :name="item.icon" class="size-4" />
           {{ item.label }}
@@ -69,7 +89,8 @@ const items = computed(() => (user.value ? NAV[user.value.role] : []))
         :key="item.to"
         :to="item.to"
         class="flex flex-1 flex-col items-center gap-1 py-2 text-xs text-muted"
-        active-class="text-primary"
+        :active-class="item.exact ? '' : ACTIVE_TABBAR"
+        :exact-active-class="item.exact ? ACTIVE_TABBAR : ''"
       >
         <UIcon :name="item.icon" class="size-5" />
         {{ item.label }}

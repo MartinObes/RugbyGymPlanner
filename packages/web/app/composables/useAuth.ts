@@ -3,7 +3,7 @@ import type { LoginInput, RegisterInput, SessionUser } from '@coachlab/core/vali
 /** Home de cada rol. La usa el middleware, el login y el registro. */
 export const ROLE_HOME: Record<SessionUser['role'], string> = {
   COACH: '/coach/players',
-  PLAYER: '/player/week',
+  PLAYER: '/player',
   ADMIN: '/admin',
 }
 
