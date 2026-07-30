@@ -11,6 +11,15 @@ export default defineNuxtConfig({
   // Tailwind y la app se sirve sin estilos.
   css: ['~/assets/css/main.css'],
 
+  ui: {
+    // Registrar un alias propio es lo que genera --ui-navy y las clases
+    // text-navy-500 / bg-navy-500. Los seis de la lista default de Nuxt UI hay
+    // que repetirlos: la opción reemplaza, no extiende.
+    theme: {
+      colors: ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'navy'],
+    },
+  },
+
   icon: {
     // Los iconos se INLINEAN en el bundle del cliente en build time.
     //

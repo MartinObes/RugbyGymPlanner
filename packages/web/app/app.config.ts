@@ -18,16 +18,27 @@
  */
 export default defineAppConfig({
   ui: {
-    // TODO: reemplazar por la paleta del club una vez definida en main.css.
+    // Las paletas están en app/assets/css/main.css y los valores documentados en
+    // docs/DESIGN-SYSTEM.md §3. tests/theme.test.ts verifica este mapeo.
     colors: {
-      primary: 'green',
-      neutral: 'slate',
+      // El rojo del club, NO el marino: UButton y UBadge usan `primary` por
+      // default, así que con el marino acá cada CTA de la app tendría que
+      // escribir color="secondary" y cualquier botón nuevo nacería mal.
+      primary: 'clubred',
+      neutral: 'clay',
 
-      // Estos tres son de significado, no de marca: conviene NO pintarlos con
-      // los colores del club. Un error tiene que leerse como error aunque el
-      // club juegue de rojo.
-      success: 'green',
-      warning: 'amber',
+      // El alias propio, registrado además en nuxt.config → ui.theme.colors. Sin
+      // ESTAS DOS COSAS juntas no existe `--ui-navy` y `color="navy"` no anda.
+      navy: 'navy',
+
+      success: 'gold',
+      warning: 'clubred',
+
+      // El único que NO va a la paleta del club, a propósito: un error tiene que
+      // leerse como error aunque el club juegue de rojo. En el panel del coach
+      // conviven "Guardar" en borgoña y "Eliminar" en el rojo más brillante de
+      // Tailwind, y el más brillante lee como más alarmante — que es lo correcto
+      // para lo destructivo.
       error: 'red',
     },
   },
