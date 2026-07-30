@@ -1,5 +1,9 @@
 # F3.5 — Dashboard del jugador y limpieza de deuda: alcance
 
+> ⚠ **SUPERADO por `2026-07-29-f35-player-dashboard-design.md`.** Las cinco decisiones abiertas de §6
+> están resueltas ahí. Este archivo se conserva porque documenta el razonamiento y el triaje de deuda
+> que llevó a esas decisiones; **no** es la fuente de verdad del alcance.
+
 > Borrador de alcance escrito el **2026-07-29** a pedido del dueño del repo, después de terminar F3.
 > **No es un plan todavía**: hay cinco decisiones abiertas (§6) que cambian materialmente el trabajo, y
 > dos de ellas contradicen decisiones ya tomadas en `CLAUDE.md`. Se resuelven primero, después se
