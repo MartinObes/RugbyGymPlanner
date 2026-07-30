@@ -113,9 +113,10 @@ Los detalles (escalas, tonos, mapeo de alias, divergencias claro/oscuro) están 
 CoachLab pasa a estar branded del club en vez de genérico — es una decisión de producto tomada a ojos
 abiertos.
 
-> **Bloqueante parcial:** los PNG `obc-logo-red.png` y `obc-logo-white.png` **no están en el repo** y
-> no existe `packages/web/public/`. Es lo único de la fase que no puede avanzar sin que el dueño del
-> repo los aporte. Todo el resto es independiente.
+Los assets **ya están en el repo**: `escudos/` trae seis variantes en varios tamaños. La elegida es
+`two-tone`, decidida bajando las tres candidatas a 34 px reales y mirándolas sobre los dos fondos, no
+por argumento — el detalle y la evidencia están en `docs/DESIGN-SYSTEM.md` §4. La task de
+implementación crea `packages/web/public/` y copia las dos que se usan.
 
 **Los 10 iconos que faltan** van a `clientBundle.icons` de `nuxt.config.ts`: `chevron-right`,
 `check-circle`, `circle-dashed`, `circle`, `message-square-plus`, `rotate-ccw`, `calendar-x`,

@@ -192,12 +192,43 @@ Se escriben con una clase `dark:` explícita. Son estas y ninguna más:
 Marca de agua en la esquina superior derecha, **en el shell de la app** (`layouts/default.vue`), no
 por pantalla.
 
-- Posición: `top: 6px; right: 6px`. Tamaño: 34 px de ancho.
-- **Claro:** versión monocromática en rojo del club (`#7d2230`), sin el disco de fondo.
-- **Oscuro:** versión monocromática en blanco puro, sin el disco de fondo.
-- El contenido lleva `padding-top` extra para que el logo no quede pegado al título ni a la píldora
-  de semana.
-- Assets: `obc-logo-red.png` y `obc-logo-white.png` en `packages/web/public/`.
+- Posición: `top: 6px; right: 6px`. Tamaño: **34 px de ancho** (el asset es 391×511, así que 34 px de
+  ancho da 44 px de alto).
+- El contenido lleva `padding-top` extra para que no quede pegado al título ni a la píldora de semana.
+
+**Variante: `two-tone`.** El set completo de variantes vive en `escudos/` (seis versiones × varios
+tamaños, aportadas por el dueño del repo). Los dos que usa la app:
+
+| Modo | Archivo de origen | Qué es |
+|---|---|---|
+| Claro | `escudos/escudo-two-tone-light@128.png` | Trazo rojo, interior claro |
+| Oscuro | `escudos/escudo-two-tone-dark@128.png` | Relleno rojo, detalles blancos |
+
+Se copian a `packages/web/public/` como `escudo-light.png` y `escudo-dark.png`. Se usa el **@128** y
+no el @256: a 34 px de ancho el @128 ya da 3,7× de densidad —de sobra para cualquier pantalla— y pesa
+la cuarta parte.
+
+**Por qué `two-tone` y no una silueta monocromática**, que es lo que se había especificado primero:
+se bajaron las tres variantes a 34 px reales y se compusieron sobre los dos fondos.
+
+- **`solid` a 34 px es un borrón.** Rellenar el interior destruye lo que hace legible un escudo —el
+  contraste entre trazo e interior— y los rayos del sol se vuelven ruido.
+- **`line` aguanta**, pero sobre el fondo claro queda lavada: tiene solo 24 % de tinta.
+- **`two-tone` lee como escudo** en los dos modos: se distinguen el borde, el interior, los rayos, y
+  se insinúa el león.
+
+Esto descarta de paso la idea de pintar el escudo con un `mask-image` de CSS y el token de color, que
+habría dado un solo archivo y el color exacto de la paleta: **el mask solo funciona con un asset de un
+color plano**, o sea con `solid`, que es la peor de las tres.
+
+> **Consecuencia aceptada: el escudo tiene su propio rojo.** El asset es `#7b1113` y el rojo del club
+> en la paleta es `#7d2230` — misma luminosidad, distinta tonalidad (rojo puro contra borgoña). Es la
+> práctica normal: el escudo conserva sus colores oficiales y la UI usa su paleta. Además no compiten
+> en pantalla: la marca de agua va arriba a la derecha y el CTA rojo abajo. Si molesta al verlo en el
+> browser, recolorear el rojo del asset a `#7d2230` es un script chico.
+
+Los `tile-*` de `escudos/` (cuadrados, con fondo rojo) **no se usan**. Quedan disponibles para un
+favicon, un `og:image` o un ícono de PWA si algún día hacen falta.
 
 ## 5. Tipografía
 
