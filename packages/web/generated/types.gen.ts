@@ -214,6 +214,7 @@ export type PlayerDay = {
     loggedCount: number;
     totalCount: number;
     note: string | null;
+    perceivedRpe: number | null;
     completed: boolean;
 };
 
@@ -1499,6 +1500,7 @@ export type PutApiPlayerDaysByDayIdEntriesByBlockExerciseIdResponse = PutApiPlay
 export type PostApiPlayerDaysByDayIdCompleteData = {
     body?: {
         note?: string | null;
+        perceivedRpe?: number | null;
     };
     path: {
         dayId: string;

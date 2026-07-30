@@ -1,7 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { dayNoteSchema, exerciseEntrySchema } from '@coachlab/core/validators/session'
+import { completeDaySchema, exerciseEntrySchema } from '@coachlab/core/validators/session'
 import { assertOwnedDay, ensureSessionLog } from '../../access/playerDay'
-import { dayNotesFor, playerWeekFor } from '../../access/playerWeek'
+import { dayClosingsFor, playerWeekFor } from '../../access/playerWeek'
 import type { AuthVariables } from '../../middleware/auth'
 import { assertRow } from '../coach/_scope'
 import { ErrorResponse } from '../schemas'
@@ -63,6 +63,7 @@ const PlayerDay = z
     loggedCount: z.number(),
     totalCount: z.number(),
     note: z.string().nullable(),
+    perceivedRpe: z.number().nullable(),
     completed: z.boolean(),
   })
   .openapi('PlayerDay')
@@ -117,7 +118,7 @@ playerWeek.openapi(
     const week = await playerWeekFor(db, { id: actor.id, positionId: actor.positionId })
     if (!week) return c.json({ ok: true as const, week: null }, 200)
 
-    const notes = await dayNotesFor(
+    const closings = await dayClosingsFor(
       db,
       actor.id,
       week.days.map((day) => day.id),
@@ -132,7 +133,8 @@ playerWeek.openapi(
           weekName: week.weekName,
           days: week.days.map((day) => ({
             ...day,
-            note: notes.get(day.id) ?? null,
+            note: closings.get(day.id)?.note ?? null,
+            perceivedRpe: closings.get(day.id)?.perceivedRpe ?? null,
             completed: completed.has(day.id),
           })),
         },
@@ -215,7 +217,7 @@ playerWeek.openapi(
     summary: 'Completar el día con una nota',
     request: {
       params: DayIdParam,
-      body: { content: { 'application/json': { schema: dayNoteSchema } } },
+      body: { content: { 'application/json': { schema: completeDaySchema } } },
     },
     responses: {
       200: { description: 'Completado', content: { 'application/json': { schema: OkResponse } } },
@@ -225,7 +227,7 @@ playerWeek.openapi(
   async (c) => {
     const actor = c.get('actor')!
     const { dayId } = c.req.valid('param')
-    const { note } = c.req.valid('json')
+    const { note, perceivedRpe } = c.req.valid('json')
     const db = c.get('db')
 
     await assertOwnedDay(db, { id: actor.id, positionId: actor.positionId }, dayId)
@@ -233,7 +235,11 @@ playerWeek.openapi(
 
     const { data, error } = await db
       .from('session_logs')
-      .update({ note: note ?? null, completed_at: new Date().toISOString() })
+      .update({
+        note: note ?? null,
+        perceived_rpe: perceivedRpe ?? null,
+        completed_at: new Date().toISOString(),
+      })
       .eq('id', log.id)
       .select('id')
       .maybeSingle()

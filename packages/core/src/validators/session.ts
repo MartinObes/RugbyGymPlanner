@@ -28,3 +28,24 @@ export const dayNoteSchema = z.object({
 })
 
 export type DayNoteInput = z.infer<typeof dayNoteSchema>
+
+/**
+ * Lo que se manda al cerrar el día: la nota y el RPE percibido.
+ *
+ * El RPE pasó de una vez por ejercicio a una vez por día (spec de F3.5 §2.1):
+ * doce preguntas por sesión garantizan que nadie las conteste, una sola es un
+ * toque. Los dos campos son opcionales y NO bloquean el cierre — si fueran
+ * obligatorios volvería a ser la encuesta que se vino a sacar.
+ *
+ * Espeja el CHECK de session_logs.perceived_rpe (migración 0017): numeric(3,1)
+ * entre 1 y 10, igual que exercise_entries.rpe.
+ */
+export const completeDaySchema = dayNoteSchema.extend({
+  perceivedRpe: z
+    .number()
+    .min(1, 'El RPE va de 1 a 10')
+    .max(10, 'El RPE va de 1 a 10')
+    .nullish(),
+})
+
+export type CompleteDayInput = z.infer<typeof completeDaySchema>

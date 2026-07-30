@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayNoteSchema, exerciseEntrySchema } from './session'
+import { completeDaySchema, dayNoteSchema, exerciseEntrySchema } from './session'
 
 describe('exerciseEntrySchema', () => {
   it('acepta una entry completa', () => {
@@ -68,5 +68,34 @@ describe('dayNoteSchema', () => {
 
   it('rechaza una nota kilométrica', () => {
     expect(dayNoteSchema.safeParse({ note: 'a'.repeat(1001) }).success).toBe(false)
+  })
+})
+
+describe('el cierre del día', () => {
+  /**
+   * El RPE del día es OPCIONAL y no bloquea cerrar: es la decisión de producto de
+   * pedirlo una vez en vez de doce (spec de F3.5 §2.1). Si fuera obligatorio,
+   * sería la misma encuesta que se vino a sacar.
+   */
+  it('acepta cerrar sin nada', () => {
+    expect(completeDaySchema.safeParse({}).success).toBe(true)
+  })
+
+  it('acepta la nota y el RPE juntos', () => {
+    const result = completeDaySchema.safeParse({ note: 'Pesado el circuito', perceivedRpe: 8 })
+    expect(result.success).toBe(true)
+  })
+
+  it('acepta medio punto, como la columna', () => {
+    expect(completeDaySchema.safeParse({ perceivedRpe: 7.5 }).success).toBe(true)
+  })
+
+  it('rechaza fuera de 1 a 10', () => {
+    expect(completeDaySchema.safeParse({ perceivedRpe: 0 }).success).toBe(false)
+    expect(completeDaySchema.safeParse({ perceivedRpe: 11 }).success).toBe(false)
+  })
+
+  it('null significa "no lo contesté", y es válido', () => {
+    expect(completeDaySchema.safeParse({ perceivedRpe: null }).success).toBe(true)
   })
 })

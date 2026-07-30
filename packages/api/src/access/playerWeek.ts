@@ -227,20 +227,22 @@ async function loadHistory(
   }
 }
 
-/** La nota que el jugador dejó en un día, para prellenar el textarea. */
-export async function dayNotesFor(
+/** Lo que el jugador dejó en un día: la nota y el RPE, para prellenar el cierre. */
+export async function dayClosingsFor(
   db: SupabaseClient<Database>,
   playerId: string,
   dayIds: readonly string[],
-): Promise<Map<string, string | null>> {
+): Promise<Map<string, { note: string | null; perceivedRpe: number | null }>> {
   if (dayIds.length === 0) return new Map()
 
   const { data, error } = await db
     .from('session_logs')
-    .select('day_id, note')
+    .select('day_id, note, perceived_rpe')
     .eq('player_id', playerId)
     .in('day_id', [...dayIds])
   if (error) throw new Error(error.message)
 
-  return new Map((data ?? []).map((row) => [row.day_id as string, row.note as string | null]))
+  return new Map(
+    (data ?? []).map((row) => [row.day_id, { note: row.note, perceivedRpe: row.perceived_rpe }]),
+  )
 }

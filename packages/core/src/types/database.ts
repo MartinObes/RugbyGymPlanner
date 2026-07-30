@@ -485,6 +485,7 @@ export type Database = {
           day_id: string
           id: string
           note: string | null
+          perceived_rpe: number | null
           player_id: string
           updated_at: string
         }
@@ -494,6 +495,7 @@ export type Database = {
           day_id: string
           id?: string
           note?: string | null
+          perceived_rpe?: number | null
           player_id: string
           updated_at?: string
         }
@@ -503,6 +505,7 @@ export type Database = {
           day_id?: string
           id?: string
           note?: string | null
+          perceived_rpe?: number | null
           player_id?: string
           updated_at?: string
         }
