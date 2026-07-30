@@ -2,7 +2,7 @@
 import { POSITIONS, isPositionId, type PositionId } from '@coachlab/core/domain/positions'
 import { changePasswordSchema } from '@coachlab/core/validators/auth'
 import { playerProfileSchema } from '@coachlab/core/validators/player'
-import type { ExercisesResponse, PlayerProfileResponse } from '~~/generated'
+import type { Evaluation, ExercisesResponse, PlayerProfileResponse } from '~~/generated'
 
 const api = usePlayerApi()
 const toast = useToast()
@@ -17,6 +17,11 @@ const { data: catalog } = await useAsyncData('catalog-exercises', () =>
   api.get<ExercisesResponse>('/api/catalog/exercises'),
 )
 const exercises = computed(() => catalog.value?.exercises ?? [])
+
+const { data: evaluationsData, refresh: refreshEvaluations } = await useAsyncData(
+  'player-evaluations',
+  () => api.get<{ evaluations: Evaluation[] }>('/api/player/evaluations'),
+)
 
 const positionItems = POSITIONS.map((p) => ({ label: p.name, value: p.id }))
 
@@ -238,6 +243,13 @@ async function submitPassword() {
         </li>
       </ul>
     </UCard>
+
+    <PlayerEvaluationsForm
+      base-path="/api/player"
+      :evaluations="evaluationsData?.evaluations ?? []"
+      :exercises="exercises"
+      @changed="() => refreshEvaluations()"
+    />
 
     <UCard>
       <template #header>
