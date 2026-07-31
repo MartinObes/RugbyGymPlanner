@@ -326,18 +326,23 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 - [x] **F0 — Setup**: monorepo pnpm, proyecto Supabase, schema completo con RLS, tipos generados, Hono con OpenAPI montado en Nitro, Nuxt SSR, funciones puras de dominio con tests, deploy a Vercel. → `docs/IMPLEMENTATION-F0.md`
 - [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
 - [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 4 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import de las planillas reales del club**. → `docs/IMPLEMENTATION-F2.md`
-- [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), **cambiar su propia contraseña**, Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día. → `docs/IMPLEMENTATION-F3.md`
-- [ ] **F3.5 — Dashboard del jugador y limpieza de deuda**: dashboard con rueda de progreso y tendencia de tests, "Mi semana" comprimida con un día por pantalla, la rutina presentada como la planilla, registro opcional en slideover, RPE una vez por día, evaluaciones en las dos puntas que sincronizan el 1RM, y la paleta del club en toda la app. → `docs/IMPLEMENTATION-F3.5.md`
-  > **Las dos están implementadas y verificadas contra la base; falta el click-through de las dos.**
-  > Rama `feature/f3`: **394 tests**, `pnpm lint` y `pnpm typecheck` en verde en los 3 paquetes,
-  > `verify:setup` **85/85**, `smoke:player` **32/32** (incluye "80% → 112 kg", "última vez" con datos
-  > reales y el trigger `0018` sincronizando el 1RM con RLS puesta), migraciones `0015`–`0018`
-  > aplicadas, `pnpm build` en verde.
+- [x] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), **cambiar su propia contraseña**, Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día. → `docs/IMPLEMENTATION-F3.md`
+- [x] **F3.5 — Dashboard del jugador y limpieza de deuda**: dashboard con rueda de progreso y tendencia de tests, "Mi semana" comprimida con un día por pantalla, la rutina presentada como la planilla, registro opcional en slideover, RPE una vez por día, evaluaciones en las dos puntas que sincronizan el 1RM, y la paleta del club en toda la app. → `docs/IMPLEMENTATION-F3.5.md`
+  > **Mergeadas a `main` el 2026-07-31**, con **402 tests**, `pnpm lint` y `pnpm typecheck` en verde
+  > en los 3 paquetes, `verify:setup` **85/85**, `smoke:player` **32/32** (incluye "80% → 112 kg",
+  > "última vez" con datos reales y el trigger `0018` sincronizando el 1RM con RLS puesta),
+  > migraciones `0015`–`0018` aplicadas.
   >
-  > **Lo único que falta para marcar las dos `[x]`:** mirar las pantallas en un browser, en los dos
-  > modos y a 380 px. Nada automático cubre la paleta renderizada, el escudo, el slideover, la carrera
-  > del 409 al completar el día, el re-login tras cambiar la contraseña, ni los inputs a 380 px. La
-  > lista exacta de qué mirar está en `docs/IMPLEMENTATION-F3.5.md` §6.1.
+  > **El click-through quedó por la mitad, a propósito y con la deuda anotada.** Se hizo la parte que
+  > no necesita sesión y encontró **dos defectos reales que ya están arreglados**: el botón primario
+  > en modo oscuro estaba en 2.31:1 (abajo de WCAG AA) y los controles medían 32 px en vez de los
+  > 44 px que pide `docs/DESIGN-SYSTEM.md` §6. Ver `docs/IMPLEMENTATION-F3.5.md` §6.7.
+  >
+  > ⚠ **Sigue sin mirarse NINGUNA pantalla autenticada** — ni del jugador ni del coach. `auth.global.ts`
+  > manda a `/login` toda ruta no pública, así que hace falta una sesión real. Quedan sin verificar el
+  > slideover, la carrera del 409 al completar el día, el re-login tras cambiar la contraseña y las
+  > ~10 pantallas del coach con la paleta nueva (items 3, 4, 5 y 7 de
+  > `docs/IMPLEMENTATION-F3.5.md` §6.1). **Es lo primero que hay que hacer en F4.**
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y **el RPE del día (`session_logs.perceived_rpe`) contra los `target_rpe` del día**, con notas; keepalive de UptimeRobot; dominio propio si se quiere.
   > **Decisión pendiente:** cómo recupera la contraseña un jugador que se la olvidó. Resetear la de OTRO usuario exige la `service_role`, que §4 prohíbe en un request, así que no es "agregar un botón": las tres opciones y sus riesgos están en `docs/IMPLEMENTATION-F2.md` §5.5 B. Hoy el camino es `pnpm set:password`.
 
