@@ -5,11 +5,20 @@ export default defineNuxtConfig({
   // correcto, sin flash de contenido ni spinner (CLAUDE.md §2).
   ssr: true,
 
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@nuxt/eslint'],
 
   // Obligatorio en Nuxt UI 3: sin esta hoja no se genera ninguna clase de
   // Tailwind y la app se sirve sin estilos.
   css: ['~/assets/css/main.css'],
+
+  ui: {
+    // Registrar un alias propio es lo que genera --ui-navy y las clases
+    // text-navy-500 / bg-navy-500. Los seis de la lista default de Nuxt UI hay
+    // que repetirlos: la opción reemplaza, no extiende.
+    theme: {
+      colors: ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'navy'],
+    },
+  },
 
   icon: {
     // Los iconos se INLINEAN en el bundle del cliente en build time.
@@ -28,21 +37,30 @@ export default defineNuxtConfig({
       scan: true,
       icons: [
         'lucide:calendar-days',
+        'lucide:calendar-x',
         'lucide:check',
+        'lucide:check-circle',
+        'lucide:chevron-left',
+        'lucide:chevron-right',
         'lucide:circle-alert',
         'lucide:clipboard-list',
         'lucide:copy',
         'lucide:dumbbell',
+        'lucide:house',
         'lucide:layout-grid',
         'lucide:list',
         'lucide:loader-circle',
         'lucide:log-out',
+        'lucide:message-square-plus',
+        'lucide:minus',
         'lucide:moon',
         'lucide:pencil',
         'lucide:plus',
         'lucide:shield',
         'lucide:sun',
         'lucide:trash-2',
+        'lucide:trending-down',
+        'lucide:trending-up',
         'lucide:triangle-alert',
         'lucide:upload',
         'lucide:user',

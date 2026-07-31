@@ -1,4 +1,5 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
+import type { Database } from '@coachlab/core/types/database'
 import { NotFoundError } from '@coachlab/core/access/rbac'
 import { programSchema } from '@coachlab/core/validators/program'
 import type { AuthVariables } from '../../middleware/auth'
@@ -347,7 +348,11 @@ programs.openapi(
       assertRow(week, weekError)
     }
 
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    // El tipo de Update de la tabla y no Record<string, unknown>: con el cliente
+    // tipado (F3.5) una columna inventada acá no compila.
+    const patch: Database['public']['Tables']['programs']['Update'] = {
+      updated_at: new Date().toISOString(),
+    }
     if (input.name !== undefined) patch.name = input.name
     if (input.currentWeekId !== undefined) patch.current_week_id = input.currentWeekId
 

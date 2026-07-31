@@ -4,8 +4,13 @@ import type { Role, SessionUser } from '../validators/auth'
  * El actor de un request autenticado. Es el SessionUser leído de profiles en
  * cada request — el rol NUNCA sale del JWT (CLAUDE.md §4): así un cambio de rol
  * pega inmediato sin esperar a que expire un token.
+ *
+ * Lleva además `positionId`, que la API necesita para resolver el programa del
+ * jugador (los assignments scopean por puesto y por grupo) y que el frontend no
+ * usa — por eso se suma acá y no en `SessionUser`, que es el contrato de la
+ * sesión de Nuxt.
  */
-export type Actor = SessionUser
+export type Actor = SessionUser & { positionId: string | null }
 
 /**
  * Recurso ajeno responde 404, nunca 403: un 403 confirma que el recurso existe

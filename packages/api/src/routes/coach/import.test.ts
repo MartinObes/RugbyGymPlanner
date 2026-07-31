@@ -44,27 +44,27 @@ describe('importRequestSchema', () => {
 
   it('acepta un árbol válido', () => {
     expect(
-      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', rounds: null, exercises: [exercise] }]))
+      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', name: null, rounds: null, exercises: [exercise] }]))
         .success,
     ).toBe(true)
   })
 
   it('rechaza un CIRCUIT sin vueltas — antes esto reventaba en el insert', () => {
     expect(
-      importRequestSchema.safeParse(wrap([{ type: 'CIRCUIT', rounds: null, exercises: [] }])).success,
+      importRequestSchema.safeParse(wrap([{ type: 'CIRCUIT', name: null, rounds: null, exercises: [] }])).success,
     ).toBe(false)
   })
 
   it('rechaza un SINGLE con vueltas', () => {
     expect(
-      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', rounds: 3, exercises: [] }])).success,
+      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', name: null, rounds: 3, exercises: [] }])).success,
     ).toBe(false)
   })
 
   it('rechaza WEIGHT sin kg', () => {
     expect(
       importRequestSchema.safeParse(
-        wrap([{ type: 'SINGLE', rounds: null, exercises: [{ ...exercise, loadType: 'WEIGHT' }] }]),
+        wrap([{ type: 'SINGLE', name: null, rounds: null, exercises: [{ ...exercise, loadType: 'WEIGHT' }] }]),
       ).success,
     ).toBe(false)
   })
@@ -73,11 +73,11 @@ describe('importRequestSchema', () => {
     const label = { ...exercise, loadType: 'LABEL' as const }
     expect(
       importRequestSchema.safeParse(
-        wrap([{ type: 'SINGLE', rounds: null, exercises: [{ ...label, loadLabel: 'p.corp' }] }]),
+        wrap([{ type: 'SINGLE', name: null, rounds: null, exercises: [{ ...label, loadLabel: 'p.corp' }] }]),
       ).success,
     ).toBe(true)
     expect(
-      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', rounds: null, exercises: [label] }]))
+      importRequestSchema.safeParse(wrap([{ type: 'SINGLE', name: null, rounds: null, exercises: [label] }]))
         .success,
     ).toBe(false)
   })
@@ -88,6 +88,7 @@ describe('importRequestSchema', () => {
         wrap([
           {
             type: 'SINGLE',
+            name: null,
             rounds: null,
             exercises: [{ ...exercise, loadType: 'LABEL', loadLabel: 'p.corp', weight: 100 }],
           },
@@ -102,6 +103,7 @@ describe('importRequestSchema', () => {
         wrap([
           {
             type: 'SINGLE',
+            name: null,
             rounds: null,
             exercises: [{ ...exercise, loadType: 'PERCENTAGE', percentage: 80, weight: 100 }],
           },

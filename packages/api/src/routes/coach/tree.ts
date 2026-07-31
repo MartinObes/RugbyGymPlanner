@@ -61,16 +61,32 @@ function pathParam<K extends string>(name: K) {
 
 export const tree = new OpenAPIHono<{ Variables: AuthVariables }>()
 
+/**
+ * Los cuatro niveles del árbol del programa: las únicas tablas que llevan
+ * `order_index`. Con el cliente tipado (F3.5) el nombre de la tabla no puede ser
+ * un `string` cualquiera —`db.from()` no resolvería ninguna columna—, y acotarlo
+ * a esta unión es además lo que hace que `.select('order_index')` typecheckee de
+ * verdad en vez de necesitar un `as`.
+ */
+type OrderedTable = 'weeks' | 'days' | 'blocks' | 'block_exercises'
+
 /** El order_index del próximo hermano, leído de los que ya existen. */
 async function nextIndexFor(
   db: AuthVariables['db'],
-  table: string,
+  table: OrderedTable,
   parentColumn: string,
   parentId: string,
 ): Promise<number> {
-  const { data, error } = await db.from(table).select('order_index').eq(parentColumn, parentId)
+  const { data, error } = await db
+    .from(table)
+    .select('order_index')
+    // El nombre de la columna padre cambia por tabla (program_id, week_id…), así
+    // que TS no puede estrecharlo desde `table`. El `never` es el tipo que
+    // PostgREST le da al filtro sobre una unión de tablas: acá lo elegimos a
+    // mano y los cuatro call sites de abajo son la verificación.
+    .eq(parentColumn as never, parentId)
   if (error) throw new Error(error.message)
-  return nextOrderIndex((data ?? []) as { order_index: number | null }[])
+  return nextOrderIndex(data ?? [])
 }
 
 // --- semanas -----------------------------------------------------------------

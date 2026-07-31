@@ -8,7 +8,10 @@
 
 App para entrenadores de rugby (extensible a otros deportes) que arma la rutina de fuerza del plantel y recibe lo que cada jugador realmente hizo.
 
-**El loop de producto:** el coach define programas por mesociclo (semanas → días → bloques → ejercicios) con cargas en kg, % del 1RM o sin peso, y un RPE objetivo por ejercicio. Cada jugador ve su rutina con los **kg ya calculados según su 1RM personal** ("80% → 112 kg"), registra lo que hizo (peso real, reps, RPE percibido, nota del día) y al completar el día eso le llega al coach. Comparar RPE objetivo vs. percibido junto con la nota es **el dato clave del producto** para ajustar cargas.
+**El loop de producto:** el coach define programas por mesociclo (semanas → días → bloques → ejercicios) con cargas en kg, % del 1RM o sin peso, y un RPE objetivo por ejercicio. Cada jugador ve su rutina con los **kg ya calculados según su 1RM personal** ("80% → 112 kg"), registra lo que hizo (peso real, reps, RPE percibido, nota del día) y al completar el día eso le llega al coach. Comparar **RPE objetivo vs. percibido** junto con la nota sigue siendo el dato clave para ajustar
+cargas, pero desde F3.5 el RPE percibido se pide **una vez por día** al cerrar la sesión, no una vez
+por ejercicio: doce preguntas por sesión garantizan que nadie las conteste. El jugador es un **lector**
+de su rutina y el registro es opcional — ver `docs/superpowers/specs/2026-07-29-f35-player-dashboard-design.md`.
 
 **Diferencial:** un solo plan en % escala a todo el plantel con cargas personalizadas por jugador.
 
@@ -71,10 +74,11 @@ Lo único que se rescató de ese intento es lo que nunca dependió de la base: l
 | Posiciones | **Las 8 de rugby, fijas, como constantes en código** (no van a la DB) | Son inmutables. Una tabla para 8 filas que nunca cambian es una join de más |
 | Grupos system | Forwards/Backs también **constantes en código** | Misma razón. Los grupos custom sí son filas |
 | Keepalive | **UptimeRobot free** pegándole a `/health`, que hace un `select 1` real | Supabase pausa un proyecto free a los 7 días sin actividad de base. Con el ping no se pausa nunca, y de paso avisa por mail si algo se cae |
+| Diseño | **Paleta del club en toda la app** (marino/rojo/dorado), con `error` en el rojo de Tailwind | Un error tiene que leerse como error aunque el club juegue de rojo. Detalle en `docs/DESIGN-SYSTEM.md` |
 
 **Sobre la cláusula de Vercel:** el plan Hobby es **solo para uso no comercial**. CoachLab lo es (§1). Si algún día el proyecto genera ingresos, hay que pasar a Pro o mudar el hosting — no es opcional, es la licencia.
 
-**Fuera del MVP (deliberado, no olvidado):** push notifications, PWA, multi-deporte configurable, tiempo real/WebSockets, compare de evaluaciones, impersonate de admin.
+**Fuera del MVP (deliberado, no olvidado):** push notifications, PWA, multi-deporte configurable, tiempo real/WebSockets, impersonate de admin.
 
 ---
 
@@ -102,12 +106,12 @@ Todo en el schema `public`, snake_case, ids `uuid` con `gen_random_uuid()` salvo
 | **programs** | `id` PK, `coach_id → profiles` | `name`, `current_week_id` |
 | **weeks** | `id` PK, `program_id → programs` CASCADE | `name`, `order_index` |
 | **days** | `id` PK, `week_id → weeks` CASCADE | `name`, `order_index` |
-| **blocks** | `id` PK, `day_id → days` CASCADE | `type`, `rounds`, `order_index` |
+| **blocks** | `id` PK, `day_id → days` CASCADE | `type`, `name` (el de la planilla, nullable), `rounds`, `order_index` |
 | **block_exercises** | `id` PK, `block_id → blocks` CASCADE, `exercise_id → exercises` | `load_type`, `weight`, `percentage`, `sets`, `reps`, `target_rpe`, `order_index` |
 | **position_groups** | `id` PK, `coach_id → profiles` | Solo grupos custom |
 | **position_group_positions** | PK `(group_id, position_id)` | Qué puestos contiene un grupo custom |
 | **program_assignments** | `id` PK, `program_id → programs` CASCADE | Cuatro columnas de destino mutuamente excluyentes + `priority`, `created_at` |
-| **session_logs** | `id` PK, UNIQUE `(player_id, day_id)` | `note`, `completed_at` |
+| **session_logs** | `id` PK, UNIQUE `(player_id, day_id)` | `note`, `perceived_rpe` (el RPE del día, nullable), `completed_at` |
 | **exercise_entries** | `id` PK, UNIQUE `(session_log_id, block_exercise_id)` | `weight`, `reps`, `rpe` |
 
 **El árbol del programa es una tabla por nivel.** No se embebe nada. La pantalla del jugador lo trae en un request con un select anidado de PostgREST:
@@ -170,6 +174,11 @@ where a.player_id = $playerId
 **Cálculo de carga** (el WorkoutProcessor, portado de .NET): si `load_type = 'PERCENTAGE'`, buscar el 1RM del jugador para ese ejercicio (match por `normalized_name`, tolerante a inclusión parcial como en `rmFor` del prototipo) y calcular `round(percentage/100 * kg * 2) / 2` (redondeo a 0.5 kg como el prototipo). Sin 1RM → mostrar el % con aviso "falta tu 1RM de X". `WEIGHT` → kg fijo. `NONE` → sin carga. **`LABEL` → se muestra la etiqueta tal cual** (`p.corp`, `barra`, `goma`, `med 9`): es el cuarto modo, agregado en la migración `0013` porque las planillas reales del club usan cargas que no son ni número ni porcentaje.
 
 **"Última vez" (`lastPerf`)**: último `exercise_entry` del jugador para el mismo ejercicio (por `normalized_name`) en días anteriores, mostrando "Semana X · Día: NN kg · N reps · RPE N". En Postgres es un join con `ORDER BY completed_at DESC LIMIT 1`, no un filtrado en memoria.
+
+**Evaluación → 1RM**: cargar una `evaluation` actualiza `one_rms` del mismo par (jugador, ejercicio)
+**solo si es la más reciente** por `tested_on`. Un test más bajo baja el 1RM: es el vigente, no el
+récord. Lo garantiza el trigger de la migración `0018`, y la misma regla existe como función pura
+(`nextOneRmFrom` en `packages/core/src/domain/evaluationTrend.ts`) para poder testearla sin base.
 
 **Vínculo jugador↔coach**: nace en el signup (trigger `handle_new_user` con el invite code) y después solo cambia por **dos RPCs**, nunca por un PATCH: `redeem_invite_code(code)` (un jugador sin coach canjea un código — lo consume la pantalla de perfil de F3) y `release_player(player_id)` (el coach saca a un jugador de su plantel). `coach_id`, `email`, `role` e `invite_code` son inmutables desde la tabla: los frena el trigger `guard_profile_changes`. Además, un programa solo "alcanza" a un jugador si es de SU coach, y los destinos de un assignment tienen que pertenecer al coach del programa — los assignments no cruzan planteles. Migraciones `0005`–`0007`.
 
@@ -285,6 +294,8 @@ renderizan hasta que el padre incluya `<NuxtPage />`.
 
 - Ramas `feature/<nombre>` desde `main`. Commits chicos con mensaje imperativo en inglés.
 - Antes de dar por terminada una feature: `pnpm lint && pnpm typecheck && pnpm test`.
+  > **`pnpm lint` existe desde F3.5** (`@nuxt/eslint` en `packages/web`). `core` y `api` definen un `lint` que solo avisa que no tienen linter propio: son TS puro y los cubre `typecheck`.
+  > **`pnpm typecheck` sí cubre los `.vue` desde F3**: antes `vue-tsc` crasheaba y salía con código 0, o sea que daba verde sin mirar el frontend. Ver `docs/IMPLEMENTATION-F3.md` §5.2. **`nuxt build` NO typecheckea** (`typeCheck` está en false): no sirve como gate de tipos.
 - Si una decisión de §2 o §3 cambia, **actualizar este archivo en el mismo PR**.
 
 ### Levantar el proyecto
@@ -315,9 +326,24 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
 - [x] **F0 — Setup**: monorepo pnpm, proyecto Supabase, schema completo con RLS, tipos generados, Hono con OpenAPI montado en Nitro, Nuxt SSR, funciones puras de dominio con tests, deploy a Vercel. → `docs/IMPLEMENTATION-F0.md`
 - [x] **F1 — Auth y shell**: registro/login con Supabase Auth, trigger que crea el `profile`, middleware de rol en Hono, guards de ruta en Nuxt, layout con sidebar, vínculo jugador↔coach por invite code. → `docs/IMPLEMENTATION-F1.md` (hardening RBAC post-auditoría aplicado: migración `0005`, verificado 30/30)
 - [x] **F2 — Panel coach**: plantel, grupos custom, editor de programas (semanas/días/bloques/ejercicios, 4 modos de carga, RPE objetivo, autosave con debounce), assignments con prioridad, **import de las planillas reales del club**. → `docs/IMPLEMENTATION-F2.md`
-- [ ] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), **cambiar su propia contraseña**, Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día.
-  > El cambio de contraseña propia no necesita ruta ni secret key: lo hace `supabase.auth.updateUser` desde el cliente, re-autenticando primero. Diseño y código en `docs/IMPLEMENTATION-F2.md` §5.5 A.
-- [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y RPE objetivo vs. percibido con notas; keepalive de UptimeRobot; dominio propio si se quiere.
+- [x] **F3 — Panel jugador**: perfil (puesto, altura, peso, 1RM con typeahead), **cambiar su propia contraseña**, Mi semana con kg calculados y "última vez", registro de peso/reps/RPE/nota, completar día. → `docs/IMPLEMENTATION-F3.md`
+- [x] **F3.5 — Dashboard del jugador y limpieza de deuda**: dashboard con rueda de progreso y tendencia de tests, "Mi semana" comprimida con un día por pantalla, la rutina presentada como la planilla, registro opcional en slideover, RPE una vez por día, evaluaciones en las dos puntas que sincronizan el 1RM, y la paleta del club en toda la app. → `docs/IMPLEMENTATION-F3.5.md`
+  > **Mergeadas a `main` el 2026-07-31**, con **402 tests**, `pnpm lint` y `pnpm typecheck` en verde
+  > en los 3 paquetes, `verify:setup` **85/85**, `smoke:player` **32/32** (incluye "80% → 112 kg",
+  > "última vez" con datos reales y el trigger `0018` sincronizando el 1RM con RLS puesta),
+  > migraciones `0015`–`0018` aplicadas.
+  >
+  > **El click-through quedó por la mitad, a propósito y con la deuda anotada.** Se hizo la parte que
+  > no necesita sesión y encontró **dos defectos reales que ya están arreglados**: el botón primario
+  > en modo oscuro estaba en 2.31:1 (abajo de WCAG AA) y los controles medían 32 px en vez de los
+  > 44 px que pide `docs/DESIGN-SYSTEM.md` §6. Ver `docs/IMPLEMENTATION-F3.5.md` §6.7.
+  >
+  > ⚠ **Sigue sin mirarse NINGUNA pantalla autenticada** — ni del jugador ni del coach. `auth.global.ts`
+  > manda a `/login` toda ruta no pública, así que hace falta una sesión real. Quedan sin verificar el
+  > slideover, la carrera del 409 al completar el día, el re-login tras cambiar la contraseña y las
+  > ~10 pantallas del coach con la paleta nueva (items 3, 4, 5 y 7 de
+  > `docs/IMPLEMENTATION-F3.5.md` §6.1). **Es lo primero que hay que hacer en F4.**
+- [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y **el RPE del día (`session_logs.perceived_rpe`) contra los `target_rpe` del día**, con notas; keepalive de UptimeRobot; dominio propio si se quiere.
   > **Decisión pendiente:** cómo recupera la contraseña un jugador que se la olvidó. Resetear la de OTRO usuario exige la `service_role`, que §4 prohíbe en un request, así que no es "agregar un botón": las tres opciones y sus riesgos están en `docs/IMPLEMENTATION-F2.md` §5.5 B. Hoy el camino es `pnpm set:password`.
 
 ---

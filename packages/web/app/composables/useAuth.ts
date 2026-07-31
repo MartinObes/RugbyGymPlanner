@@ -3,7 +3,7 @@ import type { LoginInput, RegisterInput, SessionUser } from '@coachlab/core/vali
 /** Home de cada rol. La usa el middleware, el login y el registro. */
 export const ROLE_HOME: Record<SessionUser['role'], string> = {
   COACH: '/coach/players',
-  PLAYER: '/player/week',
+  PLAYER: '/player',
   ADMIN: '/admin',
 }
 
@@ -100,11 +100,42 @@ export function useAuth() {
     return { needsEmailConfirm: false }
   }
 
+  /**
+   * Cambia la contraseña propia. No pasa por la API ni necesita la secret key:
+   * Supabase Auth deja que una sesión válida cambie su propia contraseña
+   * (decisión #1 de F1: la web es dueña del ciclo de vida de la sesión).
+   */
+  async function changePassword(current: string, next: string): Promise<void> {
+    const email = user.value?.email
+    if (!email) throw new Error('No hay sesión activa')
+
+    // updateUser NO pide la contraseña actual, así que se re-autentica primero.
+    // Sin esto, cualquiera con el dispositivo desbloqueado cambia la clave.
+    const { error: reauth } = await $supabase.auth.signInWithPassword({
+      email,
+      password: current,
+    })
+    if (reauth) throw new Error('La contraseña actual no es correcta')
+
+    const { error } = await $supabase.auth.updateUser({ password: next })
+    if (error) {
+      throw new Error(
+        /at least|length|weak/i.test(error.message)
+          ? 'La nueva contraseña tiene que tener al menos 8 caracteres'
+          : 'No se pudo cambiar la contraseña',
+      )
+    }
+
+    // signInWithPassword emitió una sesión nueva y pisó la cookie: hay que
+    // resincronizar el estado o el shell queda con el usuario viejo.
+    await refresh()
+  }
+
   async function logout(): Promise<void> {
     await $supabase.auth.signOut()
     user.value = null
     await navigateTo('/login')
   }
 
-  return { user, refresh, login, register, logout }
+  return { user, refresh, login, register, logout, changePassword }
 }

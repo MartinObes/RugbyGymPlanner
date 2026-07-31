@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { POSITIONS } from '@coachlab/core/domain/positions'
-import type { CoachPlayerResponse, ExercisesResponse } from '~~/generated'
+import type { CoachPlayerResponse, Evaluation, ExercisesResponse } from '~~/generated'
 
 const route = useRoute()
 const api = useCoachApi()
@@ -16,6 +16,11 @@ const { data: catalog } = await useAsyncData('catalog-exercises', () =>
 )
 
 const exercises = computed(() => catalog.value?.exercises ?? [])
+
+const { data: evaluationsData, refresh: refreshEvaluations } = await useAsyncData(
+  `coach-evaluations-${playerId}`,
+  () => api.get<{ evaluations: Evaluation[] }>(`/api/coach/players/${playerId}/evaluations`),
+)
 
 // --- puesto y medidas: autosave ---------------------------------------------
 
@@ -198,6 +203,13 @@ const formatDate = (iso: string) =>
           </div>
         </template>
       </UCard>
+
+      <PlayerEvaluationsForm
+        :base-path="`/api/coach/players/${playerId}`"
+        :evaluations="evaluationsData?.evaluations ?? []"
+        :exercises="exercises"
+        @changed="() => refreshEvaluations()"
+      />
     </template>
   </div>
 </template>

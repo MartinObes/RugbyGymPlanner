@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { loginSchema, registerSchema, sessionUserSchema } from './auth'
+import { changePasswordSchema, loginSchema, registerSchema, sessionUserSchema } from './auth'
 
 const validCoach = {
   name: 'Ana Pérez',
@@ -64,5 +64,42 @@ describe('sessionUserSchema', () => {
       coachId: null,
     })
     expect(parsed.role).toBe('COACH')
+  })
+})
+
+describe('changePasswordSchema', () => {
+  const valid = { current: 'vieja123', next: 'nueva1234', confirm: 'nueva1234' }
+
+  it('acepta un cambio válido', () => {
+    expect(changePasswordSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it('exige la contraseña actual', () => {
+    expect(changePasswordSchema.safeParse({ ...valid, current: '' }).success).toBe(false)
+  })
+
+  it('exige mínimo 8 en la nueva', () => {
+    const result = changePasswordSchema.safeParse({ ...valid, next: 'corta', confirm: 'corta' })
+    expect(result.success).toBe(false)
+  })
+
+  it('exige que las dos nuevas coincidan', () => {
+    const result = changePasswordSchema.safeParse({ ...valid, confirm: 'otra12345' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]!.path).toEqual(['confirm'])
+    }
+  })
+
+  it('exige que la nueva sea distinta de la actual', () => {
+    const result = changePasswordSchema.safeParse({
+      current: 'misma1234',
+      next: 'misma1234',
+      confirm: 'misma1234',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]!.path).toEqual(['next'])
+    }
   })
 })

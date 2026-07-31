@@ -201,9 +201,12 @@ export function parseCoachSheet(rows: Cell[][], sheetName: string): ParsedProgra
           day = { name: 'Sesión 1', blocks: [] }
           week.days.push(day)
         }
+        // El nombre está en la columna B de esta misma fila y hasta F3.5 se
+        // descartaba. `label` ya lo tiene resuelto arriba.
+        const blockName = label ? label.slice(0, 60) : null
         block = roundsHere
-          ? { type: 'CIRCUIT', rounds: Number(roundsHere[1]), exercises: [] }
-          : { type: 'SINGLE', rounds: null, exercises: [] }
+          ? { type: 'CIRCUIT', name: blockName, rounds: Number(roundsHere[1]), exercises: [] }
+          : { type: 'SINGLE', name: blockName, rounds: null, exercises: [] }
         day.blocks.push(block)
         continue
       }
@@ -213,7 +216,9 @@ export function parseCoachSheet(rows: Cell[][], sheetName: string): ParsedProgra
       if (!day) continue
 
       if (!block) {
-        block = { type: 'SINGLE', rounds: null, exercises: [] }
+        // Bloque implícito: aparecieron ejercicios sin fila de bloque, así que no
+        // hay nombre que rescatar.
+        block = { type: 'SINGLE', name: null, rounds: null, exercises: [] }
         day.blocks.push(block)
       }
 

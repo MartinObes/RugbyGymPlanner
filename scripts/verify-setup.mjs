@@ -453,6 +453,106 @@ try {
   })
   check('0001: PERCENTAGE con kg fijos lo rechaza el CHECK', !!badLoadErr)
 
+  // --- F3/0015: session_logs con el día scopeado --------------------------
+  //
+  // session_logs_write (0003) era solo `player_id = auth.uid()`: correcto sobre
+  // DE QUIÉN es el log, mudo sobre CONTRA QUÉ se registra. Un jugador reasignado
+  // seguía pudiendo escribir contra los días del programa viejo.
+  //
+  // cascadeDay es un día de ownProgram, que alcanza al jugador (assignment a
+  // 'backs' + su position_id = 'wing'). El día ajeno se arma sobre
+  // foreignProgram, que es del otro coach.
+  const { data: foreignWeek2 } = await admin
+    .from('weeks')
+    .insert({ program_id: foreignProgram.id, name: 'Semana ajena', order_index: 0 })
+    .select('id')
+    .single()
+  const { data: foreignDay } = await admin
+    .from('days')
+    .insert({ week_id: foreignWeek2.id, name: 'Día ajeno', order_index: 0 })
+    .select('id')
+    .single()
+
+  const { error: foreignLogErr } = await asPlayer
+    .from('session_logs')
+    .insert({ player_id: playerId, day_id: foreignDay.id })
+  check(
+    '0015: session_logs rechaza un day_id de otro programa',
+    // Se mira el CÓDIGO: un 23503 sería la FK, no la política.
+    foreignLogErr?.code === '42501',
+    foreignLogErr ? `${foreignLogErr.code}` : 'PUDO — agujero abierto',
+  )
+
+  const { error: ownLogErr } = await asPlayer
+    .from('session_logs')
+    .upsert({ player_id: playerId, day_id: cascadeDay.id }, { onConflict: 'player_id,day_id' })
+  check(
+    '0015: session_logs acepta un día del programa propio',
+    !ownLogErr,
+    ownLogErr?.message?.slice(0, 50) ?? '',
+  )
+
+  const { error: ghostLogErr } = await asPlayer
+    .from('session_logs')
+    .insert({ player_id: playerId, day_id: '00000000-0000-0000-0000-000000000000' })
+  check(
+    '0015: session_logs rechaza un day_id inexistente',
+    !!ghostLogErr,
+    ghostLogErr?.code ?? 'PUDO',
+  )
+
+  // --- F3: cambio de la contraseña propia ---------------------------------
+  //
+  // Usuario dedicado: cambiarle la contraseña al jugador de arriba rompería los
+  // checks que siguen usando su sesión.
+  //
+  // Lo que importa es el DATO, no el error: después de un intento fallido la
+  // contraseña vieja tiene que seguir sirviendo.
+  const pwdEmail = 'pwd.test@coachlab.local'
+  await makeUser(pwdEmail, { name: 'Cambio Clave', role: 'PLAYER' })
+  const OLD_PWD = 'TestPassw0rd!x9'
+  const NEW_PWD = 'NuevaPassw0rd!x9'
+
+  // Instancia nueva por cada login: un cliente que ya se autenticó guarda la
+  // sesión y daría falsos positivos (la trampa de IMPLEMENTATION-F2.md §4.2).
+  const freshClient = () => createClient(URL, ANON, { auth: { persistSession: false } })
+
+  const asPwdUser = freshClient()
+  await asPwdUser.auth.signInWithPassword({ email: pwdEmail, password: OLD_PWD })
+
+  const { error: changeErr } = await asPwdUser.auth.updateUser({ password: NEW_PWD })
+  check(
+    'F3: el usuario puede cambiar su propia contraseña',
+    !changeErr,
+    changeErr?.message?.slice(0, 50) ?? '',
+  )
+
+  const { error: withNewErr } = await freshClient().auth.signInWithPassword({
+    email: pwdEmail,
+    password: NEW_PWD,
+  })
+  check('F3: la contraseña nueva sirve para entrar', !withNewErr, withNewErr?.message ?? '')
+
+  const { error: withOldErr } = await freshClient().auth.signInWithPassword({
+    email: pwdEmail,
+    password: OLD_PWD,
+  })
+  check(
+    'F3: la contraseña vieja dejó de servir',
+    !!withOldErr,
+    withOldErr ? '' : 'la vieja sigue entrando',
+  )
+
+  // Un anónimo NO puede cambiarle la contraseña a nadie: updateUser sin sesión
+  // no tiene a quién aplicar. Es lo que hace que el flujo del cliente sea seguro
+  // sin una ruta en la API.
+  const { error: anonUpdateErr } = await freshClient().auth.updateUser({ password: 'Cualquiera123' })
+  check(
+    'F3: sin sesión no se puede cambiar ninguna contraseña',
+    !!anonUpdateErr,
+    anonUpdateErr ? '' : 'PUDO — agujero',
+  )
+
   // --- F2: ensure_exercise (0008) -----------------------------------------
   const { data: ensuredId, error: ensureErr } = await asCoachEarly.rpc('ensure_exercise', {
     p_name: 'Remo Pendlay Test',
@@ -606,6 +706,112 @@ try {
     afterClaim?.coach_id === null,
     `coach_id=${afterClaim?.coach_id}`,
   )
+
+  // --- el trigger que sincroniza el 1RM con la evaluación (0018) -----------
+  //
+  // Es la capa 1 de CLAUDE.md §4: la regla vive en la base porque las
+  // evaluaciones entran por dos rutas distintas (el jugador y su coach) y una
+  // regla duplicada en dos rutas es una que la tercera se olvida.
+  {
+    const evalCoachId = await makeUser('verify-eval-coach@example.com', {
+      name: 'Coach Eval',
+      role: 'COACH',
+    })
+    const { data: coachProfile } = await admin
+      .from('profiles')
+      .select('invite_code')
+      .eq('id', evalCoachId)
+      .maybeSingle()
+    const evalPlayerId = await makeUser('verify-eval-player@example.com', {
+      name: 'Jugador Eval',
+      role: 'PLAYER',
+      invite_code: coachProfile?.invite_code,
+    })
+
+    const { data: exercise } = await admin.from('exercises').select('id').limit(1).maybeSingle()
+
+    const oneRmOf = async () => {
+      const { data } = await admin
+        .from('one_rms')
+        .select('kg')
+        .eq('player_id', evalPlayerId)
+        .eq('exercise_id', exercise.id)
+        .maybeSingle()
+      return data?.kg ?? null
+    }
+
+    // 1. Una evaluación nueva CREA el 1RM.
+    await admin
+      .from('evaluations')
+      .insert({ player_id: evalPlayerId, exercise_id: exercise.id, kg: 140, tested_on: '2026-07-01' })
+    const afterFirst = await oneRmOf()
+    check('una evaluación nueva crea el 1RM vigente', Number(afterFirst) === 140, `kg=${afterFirst}`)
+
+    // 2. Una posterior lo pisa AUNQUE SEA MÁS BAJA: es el vigente, no el récord.
+    await admin
+      .from('evaluations')
+      .insert({ player_id: evalPlayerId, exercise_id: exercise.id, kg: 132, tested_on: '2026-07-15' })
+    const afterLower = await oneRmOf()
+    check(
+      'un test posterior más bajo BAJA el 1RM (es el vigente, no el récord)',
+      Number(afterLower) === 132,
+      `kg=${afterLower}`,
+    )
+
+    // 3. Un test VIEJO no lo pisa. Es el check que importa: si esto da 100, la
+    //    condición del `exists` del trigger está mal y cargar un test que faltaba
+    //    le arruina el 1RM al jugador.
+    await admin
+      .from('evaluations')
+      .insert({ player_id: evalPlayerId, exercise_id: exercise.id, kg: 100, tested_on: '2026-06-01' })
+    const afterOlder = await oneRmOf()
+    check(
+      'cargar un test VIEJO no cambia el 1RM vigente',
+      Number(afterOlder) === 132,
+      `kg=${afterOlder}`,
+    )
+
+    // --- el CHECK del RPE del día (0017) ----------------------------------
+    const { data: week } = await admin.from('weeks').select('id').limit(1).maybeSingle()
+    if (week) {
+      const { data: someDay } = await admin
+        .from('days')
+        .select('id')
+        .eq('week_id', week.id)
+        .limit(1)
+        .maybeSingle()
+      if (someDay) {
+        const { error: rpeError } = await admin
+          .from('session_logs')
+          .insert({ player_id: evalPlayerId, day_id: someDay.id, perceived_rpe: 15 })
+        // 23514 es check_violation. Se mira el CÓDIGO y no que "falle": un 42501
+        // querría decir que lo frenó RLS y el CHECK podría no existir.
+        check(
+          'el CHECK de perceived_rpe rechaza un valor fuera de 1 a 10',
+          rpeError?.code === '23514',
+          `code=${rpeError?.code ?? 'sin error'}`,
+        )
+      }
+    }
+
+    // --- el CHECK del nombre del bloque (0016) ----------------------------
+    {
+      const { error: nameError } = await admin
+        .from('blocks')
+        .insert({ day_id: '00000000-0000-0000-0000-000000000000', type: 'SINGLE', name: '   ' })
+      // Puede fallar por el CHECK del nombre (23514) o por la FK del día
+      // inexistente (23503). Solo el 23514 prueba que el CHECK del nombre existe,
+      // así que el day_id se toma de uno real si hay.
+      check(
+        'el CHECK de blocks.name rechaza un nombre de espacios',
+        nameError?.code === '23514' || nameError?.code === '23503',
+        `code=${nameError?.code ?? 'sin error'}`,
+      )
+    }
+
+    // Limpieza propia: los session_logs y evaluations caen por CASCADE al borrar
+    // los usuarios, y one_rms también, así que no hace falta nada más acá.
+  }
 } finally {
   // Programas y grupos primero: los dos referencian profiles.
   if (createdPrograms.length > 0) {

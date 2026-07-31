@@ -51,6 +51,12 @@ export const parsedExerciseSchema = z
 export const parsedBlockSchema = z
   .object({
     type: z.enum(['SINGLE', 'CIRCUIT']),
+    /**
+     * El nombre que el coach le puso al bloque en la columna B de la planilla
+     * ("CIRCUITO CALENTAMIENTO", "C 1"). Nullable: un bloque implícito —el que se
+     * abre porque aparecieron ejercicios sin fila de bloque— no tiene ninguno.
+     */
+    name: z.string().trim().min(1).max(60).nullable(),
     rounds: z.number().int().min(1).max(20).nullable(),
     exercises: z.array(parsedExerciseSchema).max(40),
   })

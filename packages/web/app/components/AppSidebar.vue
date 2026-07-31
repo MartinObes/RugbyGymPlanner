@@ -3,20 +3,42 @@ import type { SessionUser } from '@coachlab/core/validators/auth'
 
 const { user, logout } = useAuth()
 
-type NavItem = { to: string; label: string; icon: string }
+type NavItem = {
+  to: string
+  label: string
+  icon: string
+  /**
+   * Marcar activo SOLO en esta ruta exacta.
+   *
+   * `active-class` de NuxtLink matchea por prefijo, así que "Inicio" (`/player`)
+   * quedaría resaltado también en `/player/week` y `/player/profile` — o sea
+   * siempre, y dos ítems resaltados a la vez. Los que son prefijo de otros
+   * llevan esto.
+   */
+  exact?: true
+}
 
-// Solo páginas que existen: Mi perfil se suma en F3.
+// Solo páginas que existen.
 const NAV: Record<SessionUser['role'], NavItem[]> = {
   COACH: [
     { to: '/coach/players', label: 'Plantel', icon: 'i-lucide-users' },
     { to: '/coach/groups', label: 'Grupos', icon: 'i-lucide-layout-grid' },
     { to: '/coach/programs', label: 'Programas', icon: 'i-lucide-clipboard-list' },
   ],
-  PLAYER: [{ to: '/player/week', label: 'Mi semana', icon: 'i-lucide-calendar-days' }],
+  PLAYER: [
+    { to: '/player', label: 'Inicio', icon: 'i-lucide-house', exact: true },
+    { to: '/player/week', label: 'Mi semana', icon: 'i-lucide-calendar-days' },
+    { to: '/player/profile', label: 'Mi perfil', icon: 'i-lucide-user' },
+  ],
   ADMIN: [{ to: '/admin', label: 'Administración', icon: 'i-lucide-shield' }],
 }
 
 const items = computed(() => (user.value ? NAV[user.value.role] : []))
+
+// El resaltado va por `active-class` (prefijo) o por `exact-active-class` según
+// el ítem; se define una vez para que las dos navs no se desincronicen.
+const ACTIVE_SIDEBAR = 'bg-elevated font-medium text-primary'
+const ACTIVE_TABBAR = 'text-primary'
 </script>
 
 <template>
@@ -25,8 +47,28 @@ const items = computed(() => (user.value ? NAV[user.value.role] : []))
     <aside
       class="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-default bg-default p-4 md:flex"
     >
+      <!--
+        El escudo es la marca del shell: reemplaza al texto "CoachLab".
+
+        SIN `fixed`: el aside ya es `fixed inset-y-0 left-0`, así que el escudo va
+        en su flujo normal y hereda el `p-4` del aside como margen. Con `fixed` se
+        anclaba al viewport y salía disparado a la esquina de la pantalla en vez de
+        quedarse acá adentro.
+
+        Lleva `alt` de verdad y no `aria-hidden`: acá el escudo ES el nombre de la
+        app, así que un lector de pantalla tiene que poder leerlo.
+      -->
       <div class="flex items-center justify-between">
-        <span class="text-lg font-bold">CoachLab</span>
+        <img
+          src="/escudo-light.png"
+          alt="CoachLab"
+          class="w-10 dark:hidden"
+        >
+        <img
+          src="/escudo-dark.png"
+          alt="CoachLab"
+          class="hidden w-10 dark:block"
+        >
         <ColorModeToggle />
       </div>
 
@@ -36,7 +78,8 @@ const items = computed(() => (user.value ? NAV[user.value.role] : []))
           :key="item.to"
           :to="item.to"
           class="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-elevated"
-          active-class="bg-elevated font-medium text-primary"
+          :active-class="item.exact ? '' : ACTIVE_SIDEBAR"
+          :exact-active-class="item.exact ? ACTIVE_SIDEBAR : ''"
         >
           <UIcon :name="item.icon" class="size-4" />
           {{ item.label }}
@@ -66,7 +109,8 @@ const items = computed(() => (user.value ? NAV[user.value.role] : []))
         :key="item.to"
         :to="item.to"
         class="flex flex-1 flex-col items-center gap-1 py-2 text-xs text-muted"
-        active-class="text-primary"
+        :active-class="item.exact ? '' : ACTIVE_TABBAR"
+        :exact-active-class="item.exact ? ACTIVE_TABBAR : ''"
       >
         <UIcon :name="item.icon" class="size-5" />
         {{ item.label }}

@@ -8,6 +8,7 @@
     "./openapi": "./src/openapi.ts"
   },
   "scripts": {
+    "lint": "echo \"(sin linter propio: core y api son TS puro y los cubre typecheck)\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

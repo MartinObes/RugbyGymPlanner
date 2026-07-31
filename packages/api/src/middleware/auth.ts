@@ -1,5 +1,6 @@
 import { parseCookieHeader, serializeCookieHeader } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@coachlab/core/types/database'
 import { createMiddleware } from 'hono/factory'
 import { hasRole, UnauthorizedError, type Actor } from '@coachlab/core/access/rbac'
 import type { Role } from '@coachlab/core/validators/auth'
@@ -7,7 +8,7 @@ import { createRequestClient } from '../db/client'
 
 export type AuthVariables = {
   actor: Actor | null
-  db: SupabaseClient
+  db: SupabaseClient<Database>
 }
 
 /**
@@ -22,7 +23,7 @@ export type AuthVariables = {
 export const withActor = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
   c.set('actor', null)
 
-  let supabase: SupabaseClient
+  let supabase: SupabaseClient<Database>
   try {
     supabase = createRequestClient({
       getAll: () =>
@@ -57,7 +58,7 @@ export const withActor = createMiddleware<{ Variables: AuthVariables }>(async (c
   // con el JWT del usuario: RLS garantiza que solo puede leer su propia fila.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, name, role, invite_code, coach_id')
+    .select('id, email, name, role, invite_code, coach_id, position_id')
     .eq('id', user.id)
     .single()
 
@@ -69,6 +70,9 @@ export const withActor = createMiddleware<{ Variables: AuthVariables }>(async (c
       role: profile.role as Role,
       inviteCode: profile.invite_code,
       coachId: profile.coach_id,
+      // Lo necesita la resolución del programa del jugador: los assignments
+      // scopean por puesto y por grupo, no solo por jugador.
+      positionId: profile.position_id,
     })
   }
 

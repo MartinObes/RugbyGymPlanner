@@ -63,3 +63,49 @@ describe('calcLoad', () => {
     expect(calcLoad({ loadType: 'WEIGHT', weight: 82.5 }, ctx).label).toBe('82.5 kg')
   })
 })
+
+describe('calcLoad con LABEL', () => {
+  it('muestra la etiqueta tal cual', () => {
+    const result = calcLoad(
+      { loadType: 'LABEL', weight: null, percentage: null, loadLabel: 'p.corp' },
+      { exerciseName: 'Dominadas' },
+    )
+    expect(result.kind).toBe('label')
+    expect(result.label).toBe('p.corp')
+  })
+
+  it('no interpreta la etiqueta: "60 . 120" viaja entera', () => {
+    const result = calcLoad(
+      { loadType: 'LABEL', weight: null, percentage: null, loadLabel: '60 . 120' },
+      { exerciseName: 'Cuadriceps 1p - 2p' },
+    )
+    expect(result.label).toBe('60 . 120')
+  })
+
+  it('recorta los espacios de la etiqueta', () => {
+    const result = calcLoad(
+      { loadType: 'LABEL', weight: null, percentage: null, loadLabel: '  barra  ' },
+      { exerciseName: 'Press Banca' },
+    )
+    expect(result.label).toBe('barra')
+  })
+
+  // El CHECK block_exercises_load_shape (0013) lo impide, pero la función es
+  // defensiva: una etiqueta ausente o vacía no puede quedar como "undefined".
+  it('sin etiqueta cae a none', () => {
+    const result = calcLoad(
+      { loadType: 'LABEL', weight: null, percentage: null, loadLabel: null },
+      { exerciseName: 'Press Banca' },
+    )
+    expect(result.kind).toBe('none')
+    expect(result.label).toBe('Sin peso')
+  })
+
+  it('con etiqueta en blanco cae a none', () => {
+    const result = calcLoad(
+      { loadType: 'LABEL', weight: null, percentage: null, loadLabel: '   ' },
+      { exerciseName: 'Press Banca' },
+    )
+    expect(result.kind).toBe('none')
+  })
+})

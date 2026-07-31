@@ -75,6 +75,7 @@ export type Database = {
         Row: {
           day_id: string
           id: string
+          name: string | null
           order_index: number
           rounds: number | null
           type: string
@@ -82,6 +83,7 @@ export type Database = {
         Insert: {
           day_id: string
           id?: string
+          name?: string | null
           order_index?: number
           rounds?: number | null
           type?: string
@@ -89,6 +91,7 @@ export type Database = {
         Update: {
           day_id?: string
           id?: string
+          name?: string | null
           order_index?: number
           rounds?: number | null
           type?: string
@@ -482,6 +485,7 @@ export type Database = {
           day_id: string
           id: string
           note: string | null
+          perceived_rpe: number | null
           player_id: string
           updated_at: string
         }
@@ -491,6 +495,7 @@ export type Database = {
           day_id: string
           id?: string
           note?: string | null
+          perceived_rpe?: number | null
           player_id: string
           updated_at?: string
         }
@@ -500,6 +505,7 @@ export type Database = {
           day_id?: string
           id?: string
           note?: string | null
+          perceived_rpe?: number | null
           player_id?: string
           updated_at?: string
         }
@@ -571,6 +577,7 @@ export type Database = {
       my_position_id: { Args: never; Returns: unknown }
       my_system_group_id: { Args: never; Returns: unknown }
       owns_program: { Args: { target: string }; Returns: boolean }
+      program_of_day: { Args: { d: string }; Returns: string }
       program_reaches_me: { Args: { target: string }; Returns: boolean }
       redeem_invite_code: { Args: { code: string }; Returns: undefined }
       release_player: { Args: { player_id: string }; Returns: undefined }

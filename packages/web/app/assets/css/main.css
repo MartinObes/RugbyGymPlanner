@@ -11,3 +11,97 @@
  */
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/**
+ * Las paletas del club. La fuente de verdad de estos valores y de por qué son
+ * estos es docs/DESIGN-SYSTEM.md §3.
+ *
+ * Los tonos marcados vienen del mock validado; el resto se interpola. Cada
+ * paleta necesita los ONCE tonos porque Nuxt UI los usa todos: 500 para fondos
+ * sólidos en claro, 400 en oscuro, 50/100 para fondos suaves, 900/950 para el
+ * modo oscuro. tests/theme.test.ts lo verifica.
+ */
+@theme static {
+  /* Rojo del club — `primary` y `warning`.
+     El 500 y el 400 son los dos rojos del mock: Nuxt UI usa el 500 como acento
+     sólido en claro y el 400 en oscuro, así que la diferencia deliberada entre
+     modos sale de la escala sola, sin una sola clase `dark:`. */
+  --color-clubred-50:  #fdf4f3;
+  --color-clubred-100: #f8e6e5;  /* fondo del banner de atención */
+  --color-clubred-200: #ecc9c8;  /* borde del banner */
+  --color-clubred-300: #c2707a;
+  --color-clubred-400: #96303f;  /* acento sólido en OSCURO */
+  --color-clubred-500: #7d2230;  /* acento sólido en CLARO */
+  --color-clubred-600: #6b1b26;  /* texto sobre el tinte */
+  --color-clubred-700: #5a1620;
+  --color-clubred-800: #4a1219;
+  --color-clubred-900: #3d0f15;
+  --color-clubred-950: #24080c;
+
+  /* Dorado — `success`: badge "Completada" y la flecha de mejora. */
+  --color-gold-50:  #fdf9f0;
+  --color-gold-100: #f6ecd3;  /* fondo del badge "Completada" */
+  --color-gold-200: #ecd9ab;
+  --color-gold-300: #dcc07d;
+  --color-gold-400: #c8a15a;  /* ring de progreso sobre marino */
+  --color-gold-500: #b48a3f;
+  --color-gold-600: #a3782e;  /* texto dorado */
+  --color-gold-700: #856026;
+  --color-gold-800: #6b4d20;
+  --color-gold-900: #573f1c;
+  --color-gold-950: #32230f;
+
+  /* Marino — alias `navy`, registrado en nuxt.config. Estructura: peso prescrito,
+     tarjeta del ring, acentos. NO es `primary`: ver DESIGN-SYSTEM §3.3. */
+  --color-navy-50:  #eef1f5;
+  --color-navy-100: #dde3ed;
+  --color-navy-200: #bcc6da;
+  --color-navy-300: #8f9dba;
+  --color-navy-400: #4a5b85;
+  --color-navy-500: #1a2744;  /* el marino del club */
+  --color-navy-600: #16203a;
+  --color-navy-700: #121a2f;
+  --color-navy-800: #0e1526;
+  --color-navy-900: #0b101d;
+  --color-navy-950: #070a13;
+
+  /* Neutral cálido — `neutral`. Da el modo claro entero: cinco de estos tonos
+     caen exactos en valores del mock. El modo oscuro NO sale de acá (ver el
+     bloque .dark de abajo). */
+  --color-clay-50:  #f5f2ec;  /* fondo de página */
+  --color-clay-100: #efe9dc;  /* fondo de bloque */
+  --color-clay-200: #e4ded2;  /* borde de card */
+  --color-clay-300: #d9d0be;  /* borde de chip */
+  --color-clay-400: #b3aa9c;
+  --color-clay-500: #6f6a63;  /* texto atenuado */
+  --color-clay-600: #585349;
+  --color-clay-700: #43403a;
+  --color-clay-800: #302d29;
+  --color-clay-900: #1a1a1a;  /* texto principal */
+  --color-clay-950: #111010;
+}
+
+/**
+ * Modo oscuro: las superficies son MARINAS, no cálidas.
+ *
+ * No se puede resolver con la escala de `clay`: Nuxt UI consume los tonos 200,
+ * 300, 400, 500, 700 y 900 en los DOS modos (verificado en
+ * @nuxt/ui/dist/runtime/index.css), así que una escala que cambiara de familia a
+ * mitad de camino saldría del color equivocado en uno de los dos.
+ *
+ * Se sobrescriben las variables de superficie con los valores del mock. Los tonos
+ * de `clay` que el modo oscuro usaría quedan pisados; los de texto acentuado y
+ * los alias de color siguen saliendo de sus escalas.
+ */
+.dark {
+  --ui-bg:              #10152a;  /* fondo de página */
+  --ui-bg-muted:        #1a2038;  /* tarjeta */
+  --ui-bg-elevated:     #1a2038;
+  --ui-bg-accented:     #242c4a;  /* header de bloque, chips */
+  --ui-border:          #2b3350;
+  --ui-border-muted:    #242c4a;
+  --ui-border-accented: #3a4266;
+  --ui-text:            #eef0f5;
+  --ui-text-muted:      #a4acc7;
+  --ui-text-dimmed:     #8f97b3;
+}

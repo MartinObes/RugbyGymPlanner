@@ -24,7 +24,10 @@ export function useCoachApi() {
       })) as T
     } catch (error) {
       const data = (error as { data?: { error?: string } }).data
-      throw new Error(data?.error ?? 'No se pudo completar la operación')
+      // `cause` y no solo el mensaje: el toast muestra el texto lindo de la API,
+      // pero el error original de $fetch (status, url, body) es lo único que
+      // permite debuguear después.
+      throw new Error(data?.error ?? 'No se pudo completar la operación', { cause: error })
     }
   }
 

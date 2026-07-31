@@ -61,3 +61,19 @@ describe('oneRmSchema', () => {
     expect(oneRmSchema.safeParse({ exerciseId: 'press-banca', kg: 100 }).success).toBe(false)
   })
 })
+
+describe('playerProfileSchema con name', () => {
+  it('acepta un nombre', () => {
+    expect(playerProfileSchema.parse({ name: '  Juan Pérez  ' }).name).toBe('Juan Pérez')
+  })
+
+  it('rechaza un nombre de una letra', () => {
+    expect(playerProfileSchema.safeParse({ name: 'J' }).success).toBe(false)
+  })
+
+  it('sigue descartando role y coachId', () => {
+    const result = playerProfileSchema.parse({ role: 'ADMIN', coachId: 'otro', name: 'Juan' })
+    expect(result).not.toHaveProperty('role')
+    expect(result).not.toHaveProperty('coachId')
+  })
+})
