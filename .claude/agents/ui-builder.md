@@ -10,15 +10,19 @@ components.
 
 ## Architecture rules
 
-- **Nuxt 4 in SSR mode**, running on Lambda. Pages render on the server with the session cookie
-  available, so role-dependent UI is decided server-side, not after hydration.
-- **All API calls go through the generated client in `packages/web/generated/`** (produced by hey-api
-  from the OpenAPI spec the Hono API exports). Never hand-write a `$fetch` against a route path, and
-  never edit the generated client. If the endpoint you need doesn't exist, define its Zod schema and
-  request signature and report it — the API side implements it.
+- **Nuxt 4 in SSR mode**, served by Nitro on Vercel. Pages render on the server with the session
+  cookie available, so role-dependent UI is decided server-side, not after hydration.
+- **API calls go through the `useCoachApi` / `usePlayerApi` composables**, never a bare `$fetch` in a
+  component: they are what forwards the session cookie during SSR and turns the typed
+  `{ ok: false, error }` body into a readable message. **Response types** come from
+  `packages/web/generated/` (hey-api, from the OpenAPI spec the Hono API exports) and that directory
+  is generated — nobody edits it. If the endpoint you need doesn't exist, define its Zod schema and
+  request signature and report it; the API side implements it.
 - **Never reimplement domain logic in a component.** `calcLoad`, `lastPerf`, `resolveProgram`,
   `normName` and friends are imported from `@coachlab/core` or already applied by the API. A
   percentage-to-kg calculation written inline in a `.vue` file is a bug, not a shortcut.
+- **Hiding a control is not security** (CLAUDE.md §4, layer 5). The API and RLS still reject; your
+  job is only to stop offering an action that would fail.
 - Forms: `UForm` from Nuxt UI with a Zod resolver, reusing the schemas from
   `packages/core/src/validators/` — never redefine a schema inside a component.
 - Nuxt UI components first; only reach for custom markup when Nuxt UI genuinely has no primitive.
@@ -36,9 +40,9 @@ components.
 
 - **Program editor** (coach): weeks → days → blocks (SINGLE/CIRCUIT) → exercises. Autosave with
   debounce, optimistic local state, revert + toast on failure. The load-mode selector is dynamic:
-  `WEIGHT` shows kg, `PERCENTAGE` shows %, `NONE` shows nothing — and **switching modes must clear the
-  previous mode's field before saving**, or the Zod coherence rule rejects the update and the autosave
-  fails silently for the user.
+  `WEIGHT` shows kg, `PERCENTAGE` shows %, `LABEL` shows a short free-text tag, `NONE` shows
+  nothing — and **switching modes must clear the previous mode's field before saving**, or the
+  `block_exercises_load_shape` CHECK rejects the update and the autosave fails silently for the user.
 - **Player's week**: the computed load (`80% → 112 kg`) is the largest, most prominent thing on the
   row — it's what the player opened the app for. Then RPE objetivo, the coach's note, and the "última
   vez" line. Missing 1RM renders the amber hint ("falta tu 1RM de <ejercicio>") plus a banner linking

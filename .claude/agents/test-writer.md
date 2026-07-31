@@ -14,9 +14,10 @@ behavior, and report it — the owning agent fixes the source.
 - `resolveProgram`: all 4 priority levels; player beats custom group beats system group beats
   position; priority overrides that invert the natural order; tie broken by newest `createdAt`;
   player with no position; player with a position but no assignments anywhere; input array not mutated.
-- `calcLoad`: the three LoadTypes; 0.5 kg rounding (`80% of 143 → 114.5`); missing 1RM returns the
-  typed `missing-1rm` result carrying the exercise name; `WEIGHT` with no weight degrades instead of
-  throwing.
+- `calcLoad`: the four LoadTypes (`WEIGHT`, `PERCENTAGE`, `LABEL`, `NONE`); 0.5 kg rounding
+  (`80% of 143 → 114.5`); missing 1RM returns the typed `missing-1rm` result carrying the exercise
+  name; `WEIGHT` with no weight degrades instead of throwing; a `load_type` the code does not know
+  falls back to `NONE` instead of breaking the render.
 - `rmFor`: exact match; accent/case tolerance; partial inclusion in both directions; longest match
   wins among several; no match returns null.
 - `normName`: accents, case, extra spaces, empty string, ñ preserved.
@@ -31,11 +32,17 @@ behavior, and report it — the owning agent fixes the source.
 Hono tests run with `app.request()` — no server, no deploy. Cover:
 - A COACH requesting another coach's player/program gets **404** — never data, never 403.
 - A PLAYER can only read their own resolved program and only write their own SessionLog entries.
-- A route called with no cookie, an expired JWT, or a tampered JWT rejects before touching the table.
+- A route called with no cookie, an expired JWT, or a tampered JWT rejects before touching the data.
 - A profile update carrying `role` or `coachId` in the body does not change them.
 - ADMIN sees everything.
 
-**P3 — E2E (Playwright):** only once the full coach→player→log loop exists; don't start it prematurely.
+**P3 — RLS policies (CLAUDE.md §5).** Layer 1 of §4, and the one no code test reaches: a policy
+written wrong still passes every route test, because the route never asked for the forbidden row.
+These need a real session against the database, so they live in the verification scripts rather than
+in Vitest. Assert on the **Postgres error code** (`42501` for a policy, `23514` for a CHECK), never
+on "it failed" — the two failure modes look identical from the outside and mean opposite things.
+
+**P4 — E2E (Playwright):** only once the full coach→player→log loop exists; don't start it prematurely.
 
 ## Style
 
@@ -44,6 +51,7 @@ Hono tests run with `app.request()` — no server, no deploy. Cover:
 - Test names describe behavior in plain language, in Spanish for domain rules
   (`it('individual le gana a grupo custom')`) since that's how the team discusses them.
 - One behavior per test; table-driven (`it.each`) for input matrices like LoadType coherence.
-- Domain tests never touch AWS. If a test you're writing needs a table, it belongs in P2, not P1.
+- Domain tests never touch the database. If a test you're writing needs one, it belongs in P2 or P3,
+  not P1.
 - Run `pnpm test` after writing; report the summary (passed/failed/bugs found) explicitly, with the
   actual output — never claim green without having seen it.

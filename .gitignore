@@ -13,6 +13,9 @@ dist/
 supabase/.temp/
 supabase/.branches/
 
+# Mockups del acompañante visual de brainstorming. Son scratch de una sesión.
+.superpowers/
+
 # Generado por `pnpm dump:openapi`. Es un artefacto intermedio: la fuente es el
 # schema Zod de las rutas. El cliente en packages/web/generated/ SÍ se versiona,
 # para que el repo compile sin tener que regenerarlo.

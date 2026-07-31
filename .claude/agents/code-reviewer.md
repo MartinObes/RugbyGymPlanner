@@ -14,30 +14,39 @@ ground the review in facts. You never edit code.
    Flag silent divergences (a different rounding, a changed priority order) as HIGH even if the code
    "works".
 2. **Architecture boundaries**:
-   - Domain logic stays pure in `packages/core/src/domain/` — no ElectroDB, no AWS SDK, no Hono, no
-     Vue, no `process.env`. It ships to the browser too.
-   - Only `packages/core/src/entities/` builds DynamoDB keys. A `pk`/`sk` string assembled in a route
-     or a component is a finding.
-   - Components don't call the API directly — they go through the generated hey-api client, and
-     nobody edits `packages/web/generated/`.
+   - Domain logic stays pure in `packages/core/src/domain/` — no Supabase client, no Hono, no Vue, no
+     `process.env`. It ships to the browser too.
+   - SQL lives in `supabase/migrations/`, not in application code. A route assembling DDL, or a
+     business rule expressed only as a string passed to `rpc()`, is a finding.
+   - Components don't call the API directly — they go through the `useCoachApi` / `usePlayerApi`
+     composables, and nobody edits `packages/web/generated/` or
+     `packages/core/src/types/database.ts` (both are generated).
    - Validation is Zod-only and not duplicated; schemas derive types via `z.infer`, no parallel
      hand-written interfaces.
-3. **DynamoDB-specific smells**: any `scan` in application code; a new access pattern served by
-   filtering a large query in memory instead of by an index; an embedded map turned into an array
-   (breaks the editor's stable update paths); an attribute added to `Week` or `SessionLog` without a
-   thought for the 400 KB item limit; uniqueness enforced by a GSI read-then-write instead of a
-   conditional `TransactWrite`.
+3. **Postgres / Supabase smells**: **`service_role` anywhere that runs during a request** — that is
+   RLS deleted, and it is BLOQUEANTE by default (CLAUDE.md §4); a new table without
+   `ENABLE ROW LEVEL SECURITY` and an explicit policy; an edit to an already-applied migration
+   instead of a new one; an invariant expressible as a `CHECK` that lives only in Zod; a query
+   relying on the order rows come back in instead of sorting by `order_index`; a `security definer`
+   function without a fixed `search_path`; results filtered in memory that the query could have
+   filtered.
 4. **Security smell check**: quick pass for missing `requireRole`, ownership checks skipped on a
    `get`, client-trusted ids or roles. If the changeset touches routes or access helpers
    substantially, recommend a full `rbac-auditor` pass instead of duplicating it here.
 5. **Conventions**: `Exercise` spelling (never `Excercise`); UI strings in Spanish es-UY with "vos",
    code/comments/commits in English; typed `{ ok, error }` responses instead of raw throws; no new
    dependencies without justification against CLAUDE.md §2.
-6. **Stack residue**: any mention of Next.js, Prisma, PostgreSQL, Neon, Auth.js, shadcn/ui, Vercel,
-   `server actions` or `revalidatePath` is left over from the discarded stack. Flag it — CLAUDE.md §1
-   says these must be corrected, not ignored.
+6. **Stack residue** — CLAUDE.md §7.5 says these get corrected, not ignored. **Two** discarded
+   stacks, and neither list includes the current one:
+   - #1: Next.js, Prisma, Neon, Auth.js, shadcn/ui, `server actions`, `revalidatePath`.
+   - #2: AWS, SST, Lambda, CloudFront, DynamoDB, ElectroDB, single-table, GSI, `pk`/`sk`, argon2,
+     hand-rolled JWT.
+
+   **Vercel, Postgres, Supabase, Nuxt, Hono, Zod and hey-api are the CURRENT stack** (CLAUDE.md §2).
+   Flagging one of those as residue is itself an error — check the table in §2 before you call
+   something legacy.
 7. **Simplicity for the scale**: ~300 users. Flag over-engineering (premature caching, unnecessary
-   abstraction layers, a GSI nobody queries) as real findings, not style nits.
+   abstraction layers, an index nobody queries) as real findings, not style nits.
 8. **Tests**: new domain logic or scoping behavior without tests → note it and recommend delegating to
    `test-writer`.
 
