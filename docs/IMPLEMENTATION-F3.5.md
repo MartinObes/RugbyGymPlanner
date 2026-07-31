@@ -214,19 +214,56 @@ arruinaría el 1RM al jugador.
 
 Lo del spec §12 sigue vigente. Lo que agrega esta implementación:
 
-### 6.1. Nadie miró las pantallas en un browser
+### 6.1. El click-through en browser — parcialmente saldado el 2026-07-31
 
-Es la deuda de F3 y **sigue abierta**. Ningún test automático cubre:
+Se levantó la app y se manejó Chrome con `playwright-core` (instalado **fuera del repo**, en el
+scratchpad, para no tocar el lockfile). Estado por item:
 
-1. Que la paleta se vea: que el botón primario sea borgoña, el fondo claro cálido (`#f5f2ec`) y el
-   oscuro marino (`#10152a`).
-2. Que el escudo cambie de **arte** —no solo de color— al cambiar de modo.
-3. El slideover: que los −/+ sean tocables con el pulgar y que el peso arranque en el prescrito.
-4. **El caso del 409**: escribir reps y tocar "Completar día" en menos de un segundo. El cableado de
-   `flush` está fijado por `tests/autosave.test.ts`, pero el test lee archivos, no ejecuta el debounce.
-5. El re-login después de cambiar la contraseña *(pendiente desde F3)*.
-6. Que los inputs sean tocables a 380 px sin zoom *(pendiente desde F3)*.
-7. Una pasada por las ~10 pantallas del coach para ver qué quedó raro con la paleta nueva.
+| # | Qué | Estado |
+|---|---|---|
+| 1 | La paleta se ve | ✅ **verificada** |
+| 2 | El escudo cambia de **arte**, no de color | ✅ **verificado** |
+| 3 | El slideover: −/+ tocables, peso en el prescrito | ⛔ **falta** — necesita sesión de jugador |
+| 4 | El caso del 409 al completar el día | ⛔ **falta** — ídem |
+| 5 | El re-login tras cambiar la contraseña | ⛔ **falta** — ídem |
+| 6 | Inputs tocables a 380 px sin zoom | ✅ **fallaba — arreglado** (§6.7) |
+| 7 | Pasada por las ~10 pantallas del coach | ⛔ **falta** — necesita sesión de coach |
+
+Lo verificado, con el número medido y no estimado:
+
+- **La paleta llega de verdad.** `--ui-primary` = `#7d2230` en claro y `#96303f` en oscuro, leído del
+  DOM vivo. Eso **cierra la pregunta abierta de `docs/DESIGN-SYSTEM.md` §3.5**: la convención 500/400
+  de Nuxt UI se cumple, así que los dos rojos del mock salen de una escala sin ningún `dark:`. El
+  fondo oscuro es `#10152a` y el claro es cálido.
+- **El escudo es arte distinto**, no un recoloreo: el claro es borgoña macizo y el oscuro es línea
+  blanca — los rayos del sol y el león están perfilados en vez de rellenos.
+
+**Lo que falta es la mitad autenticada** (3, 4, 5 y 7): un `auth.global.ts` manda a `/login` toda ruta
+que no sea pública, así que sin una sesión real no se renderiza ninguna pantalla del jugador ni del
+coach. Los dos scripts que las poblarían (`verify:setup`, `smoke:player`) piden
+`SUPABASE_SERVICE_ROLE_KEY`, que **no está en `.env` y no debe estarlo** (CLAUDE.md §4).
+
+### 6.7. Dos defectos que el click-through encontró y se arreglaron
+
+Los dos son de la clase que ningún test del repo podía agarrar, porque solo existen una vez que el
+navegador resuelve las variables y calcula el layout.
+
+**A. El label del botón primario en oscuro estaba en 2.31:1.** Nuxt UI pinta el `solid` con
+`text-inverted`, que en oscuro es texto **oscuro**, asumiendo un acento claro. `clubred-400`
+(`#96303f`) no lo es. El CTA más importante de la app —"Entrar", "Completar día"— quedaba ilegible en
+modo oscuro. Con blanco da **7.52:1**. Es la 4ª divergencia de `DESIGN-SYSTEM.md` §3.5, y también
+tocaba a `navy` (2.59:1 → 6.72:1). `gold` y `error` se dejaron como estaban **a propósito**: son
+claros de verdad y el blanco los habría roto.
+
+**B. Los controles medían 32 px, no 44.** `DESIGN-SYSTEM.md` §6 pide "objetivos táctiles de 44 px de
+alto real" desde el principio; nunca se había medido. Los tamaños de Nuxt UI son *padding*, no alto
+fijo, así que el default `md` da 32 px. Además la fuente del campo era de **14 px**, y abajo de 16
+Safari en iOS hace zoom solo al enfocar: el "sin zoom" del item 6 se rompía por partida doble. Ahora
+`md` está redefinido en `app.config.ts` (tabla en `DESIGN-SYSTEM.md` §6) y **el botón se queda en 14 px
+a propósito** — el zoom de iOS solo dispara en campos editables.
+
+Los dos quedan fijados por 8 tests nuevos en `tests/theme.test.ts` (20 → 28). Se verificó que los
+tests **fallan** si se revierte el arreglo, no solo que pasan con él.
 
 > **Lo único que sí se verificó sin browser** es lo que se podía leer del código: que
 > `--ui-primary` resuelva al tono **500 en claro y 400 en oscuro** está confirmado en

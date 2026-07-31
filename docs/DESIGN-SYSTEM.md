@@ -170,7 +170,7 @@ Escala `clay`, anclada en los valores del mock — cinco caen exactos en tonos q
 | 900 | `#1a1a1a` | `text-highlighted` — **texto principal del mock** |
 | 950 | `#111010` | — |
 
-### 3.5. Las tres divergencias claro/oscuro que el token system no resuelve
+### 3.5. Las cuatro divergencias claro/oscuro que el token system no resuelve
 
 Se escriben con una clase `dark:` explícita. Son estas y ninguna más:
 
@@ -181,11 +181,18 @@ Se escriben con una clase `dark:` explícita. Son estas y ninguna más:
 3. **El ring de progreso.** Claro: dorado sobre tarjeta marina. Oscuro: rojo del club sobre tarjeta
    `#1a2038`.
 
-> **Pendiente de verificar en browser, no de asumir:** que `--ui-primary` resuelva a `<paleta>-500`
-> en claro y `<paleta>-400` en oscuro. Es la convención documentada de Nuxt UI v3 y haría que los dos
-> rojos del mock (`#7d2230` y `#96303f`) salgan de una sola escala sin ningún `dark:`. La variable la
-> inyecta el plugin en runtime, así que **no se puede confirmar leyendo los archivos**: se confirma
-> mirando la pantalla.
+4. **El label de un botón/badge `solid` en oscuro.** Claro: blanco sobre el acento. Oscuro: Nuxt UI
+   pone `text-inverted`, que ahí es texto **oscuro**, porque asume una paleta de acento clara (las de
+   Tailwind lo son: `red-400` es rosado). Las del club no: `clubred-400` (#96303f) y `navy-400`
+   (#4a5b85) siguen siendo oscuras y el label quedaba en **2.31:1** y **2.59:1**, abajo del 4.5:1 de
+   WCAG AA. → `dark:text-white` para `primary`, `warning` y `navy` en `app.config.ts` (7.52:1 y
+   6.72:1). **`gold` y `error` quedan afuera a propósito:** son claros de verdad y con texto oscuro
+   dan 7.21:1 y 6.29:1 — ponerles blanco los rompería (2.41:1 y 2.77:1).
+
+> ~~**Pendiente de verificar en browser:**~~ **Verificado el 2026-07-31.** `--ui-primary` resuelve a
+> `<paleta>-500` en claro (`#7d2230`) y `<paleta>-400` en oscuro (`#96303f`), leído del DOM vivo con
+> `getComputedStyle`. Los dos rojos del mock salen de una sola escala sin ningún `dark:`, como se
+> esperaba. Lo que la convención **no** cubre es el *label* sobre ese fondo: esa es la divergencia 4.
 
 ## 4. Escudo del club
 
@@ -246,6 +253,20 @@ favicon, un `og:image` o un ícono de PWA si algún día hacen falta.
 Ancho de referencia: **380 px**. Todo tocable sin zoom: **objetivos táctiles de 44 px de alto real**.
 Los chips se ven más chicos en el mock porque está renderizado a escala; en la implementación el área
 táctil del chip o de la fila se expande a 44 px aunque el contenido visual sea más compacto.
+
+**Cómo se cumple (2026-07-31).** El default de Nuxt UI daba **32 px** medidos en pantalla, no 44: sus
+tamaños son padding, no alto fijo (`md` = `px-2.5 py-1.5 text-sm`). El tamaño `md` está redefinido en
+`app.config.ts`, así que la regla se cumple sola y ningún control nuevo nace chico:
+
+| | Clases | Alto | Fuente |
+|---|---|---|---|
+| `UButton` | `px-3.5 py-3 text-sm` | 44 px | 14 px |
+| `UInput` · `USelect` · `UTextarea` · `UInputNumber` | `px-3 py-2.5 text-base` | 44 px | **16 px** |
+
+Los **16 px del campo editable no son estética**: abajo de eso Safari en iOS hace zoom solo al
+enfocar y deja al jugador con la pantalla corrida. Es la mitad de "tocable **sin zoom**" que el alto
+no cubre. El botón se queda en 14 px a propósito — el zoom de iOS solo dispara en campos editables,
+así que subirle la fuente engordaría la tipografía sin arreglar nada.
 
 ## 7. Anatomía de una fila de ejercicio
 

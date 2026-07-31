@@ -81,6 +81,52 @@ describe('el modo oscuro sobrescribe las superficies', () => {
   })
 })
 
+describe('la 4ª divergencia: el label del solid en oscuro', () => {
+  // Nuxt UI pinta el solid con `text-inverted`, que en oscuro es texto OSCURO
+  // porque asume una paleta de acento clara. clubred-400 y navy-400 no lo son:
+  // sin esto el label queda en 2.31:1 y 2.59:1, abajo del 4.5:1 de WCAG AA.
+  // Medido en pantalla el 2026-07-31. Ver docs/DESIGN-SYSTEM.md §3.5.
+  for (const component of ['button', 'badge']) {
+    it(`${component} lleva dark:text-white en primary, warning y navy`, () => {
+      const block = appConfig.slice(appConfig.indexOf(`${component}: {`))
+      for (const color of ['primary', 'warning', 'navy']) {
+        expect(
+          block,
+          `falta el override de ${color} en ${component}`,
+        ).toMatch(new RegExp(`color:\\s*'${color}',\\s*variant:\\s*'solid',\\s*class:\\s*'dark:text-white'`))
+      }
+    })
+  }
+
+  it('gold y error NO lo llevan: son claros y el blanco los rompería', () => {
+    // gold-400 y red-400 con texto oscuro dan 7.21:1 y 6.29:1. Con blanco
+    // caerían a 2.41:1 y 2.77:1 — el override sería un downgrade.
+    for (const color of ['success', 'error']) {
+      expect(appConfig).not.toMatch(
+        new RegExp(`color:\\s*'${color}',\\s*variant:\\s*'solid',\\s*class:\\s*'dark:text-white'`),
+      )
+    }
+  })
+})
+
+describe('los 44 px de objetivo táctil', () => {
+  // docs/DESIGN-SYSTEM.md §6. El default de Nuxt UI da 32 px porque sus tamaños
+  // son padding y no alto fijo. Verificado en pantalla el 2026-07-31.
+  it('el botón redefine md a 44 px', () => {
+    expect(appConfig).toMatch(/button:\s*\{[\s\S]*?md:\s*\{\s*base:\s*'px-3\.5 py-3 text-sm/)
+  })
+
+  for (const component of ['input', 'select', 'textarea', 'inputNumber']) {
+    it(`${component} redefine md a 44 px con fuente de 16 px`, () => {
+      // text-base = 16 px. Abajo de 16, Safari en iOS hace zoom al enfocar y se
+      // rompe el "sin zoom" de §6 aunque el alto esté bien.
+      expect(appConfig).toMatch(
+        new RegExp(`${component}:\\s*\\{\\s*variants:\\s*\\{\\s*size:\\s*\\{\\s*md:\\s*\\{\\s*base:\\s*'px-3 py-2\\.5 text-base`),
+      )
+    })
+  }
+})
+
 describe('el escudo del club', () => {
   it('los dos assets están en public/', () => {
     // El nombre dice el MODO en el que se usa, no el color del arte:

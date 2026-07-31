@@ -41,5 +41,71 @@ export default defineAppConfig({
       // para lo destructivo.
       error: 'red',
     },
+
+    /**
+     * La CUARTA divergencia claro/oscuro (docs/DESIGN-SYSTEM.md §3.5).
+     *
+     * Nuxt UI pinta todo botón/badge `solid` con `text-inverted`, que en oscuro
+     * es texto OSCURO. Eso asume que la paleta del acento es CLARA en oscuro,
+     * como las de Tailwind (red-400 es rosado). Las del club no lo son:
+     * `clubred-400` (#96303f) y `navy-400` (#4a5b85) siguen siendo oscuras, así
+     * que el label quedaba a **2.31:1** y **2.59:1** — abajo del 4.5:1 de WCAG AA
+     * y medido en pantalla, no estimado.
+     *
+     * Con texto blanco esos mismos fondos dan 7.52:1 y 6.72:1.
+     *
+     * `gold` y `error` NO van acá a propósito: gold-400 (#c8a15a) y red-400
+     * (#f87171) sí son claros, y con texto oscuro dan 7.21:1 y 6.29:1. Ponerles
+     * blanco los rompería (2.41:1 y 2.77:1).
+     */
+    button: {
+      compoundVariants: [
+        { color: 'primary', variant: 'solid', class: 'dark:text-white' },
+        { color: 'warning', variant: 'solid', class: 'dark:text-white' },
+        { color: 'navy', variant: 'solid', class: 'dark:text-white' },
+      ],
+      /**
+       * 44 px de alto real (docs/DESIGN-SYSTEM.md §6). El default de Nuxt UI
+       * (`py-1.5 text-sm`) da 32 px medidos en pantalla.
+       *
+       * El texto queda en `text-sm`: el zoom automático de iOS al enfocar solo
+       * dispara en campos editables, no en botones, así que subirle la fuente a
+       * un botón engordaría la tipografía de la app sin arreglar nada.
+       * 20 px de line-height + py-3 (12 px × 2) = 44.
+       */
+      variants: {
+        size: {
+          md: { base: 'px-3.5 py-3 text-sm gap-1.5' },
+        },
+      },
+    },
+    badge: {
+      compoundVariants: [
+        { color: 'primary', variant: 'solid', class: 'dark:text-white' },
+        { color: 'warning', variant: 'solid', class: 'dark:text-white' },
+        { color: 'navy', variant: 'solid', class: 'dark:text-white' },
+      ],
+    },
+
+    /**
+     * Los campos editables van a 44 px Y a 16 px de fuente.
+     *
+     * Los 16 px no son estética: abajo de eso, Safari en iOS hace zoom solo al
+     * enfocar el campo y deja al jugador con la pantalla corrida en medio del
+     * gimnasio. Es la mitad de "tocable sin zoom" de §6 que el alto no cubre.
+     * 24 px de line-height + py-2.5 (10 px × 2) = 44.
+     */
+    input: {
+      variants: { size: { md: { base: 'px-3 py-2.5 text-base gap-1.5' } } },
+    },
+    select: {
+      variants: { size: { md: { base: 'px-3 py-2.5 text-base gap-1.5' } } },
+    },
+    textarea: {
+      variants: { size: { md: { base: 'px-3 py-2.5 text-base gap-1.5' } } },
+    },
+    inputNumber: {
+      variants: { size: { md: { base: 'px-3 py-2.5 text-base gap-1.5' } } },
+    },
   },
 })
