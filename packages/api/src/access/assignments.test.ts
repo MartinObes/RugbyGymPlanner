@@ -7,8 +7,6 @@ const base: AssignmentRow = {
   player_id: null,
   position_group_id: null,
   system_group_id: null,
-  position_id: null,
-  priority: 0,
   created_at: '2026-01-01T00:00:00Z',
 }
 
@@ -25,30 +23,29 @@ describe('kindOf', () => {
     expect(kindOf({ ...base, system_group_id: 'forwards' })).toBe('SYSTEM_GROUP')
   })
 
-  it('deriva POSITION de position_id', () => {
-    expect(kindOf({ ...base, position_id: 'wing' })).toBe('POSITION')
-  })
-
   it('respeta la precedencia del CHECK: si viniera más de uno, gana el más específico', () => {
     // El CHECK program_assignments_one_target lo hace imposible en la base; el
     // orden acá es para que la derivación sea determinística de todos modos.
-    expect(kindOf({ ...base, player_id: 'pl1', position_id: 'wing' })).toBe('PLAYER')
+    expect(kindOf({ ...base, player_id: 'pl1', position_group_id: 'g1' })).toBe('PLAYER')
   })
 })
 
 describe('toCandidate', () => {
   it('mapea las columnas al contrato de resolveProgram', () => {
-    const candidate = toCandidate({ ...base, position_id: 'wing', priority: 7 })
+    const candidate = toCandidate({ ...base, position_group_id: 'g1' })
     expect(candidate).toEqual({
       assignmentId: 'a1',
       programId: 'p1',
-      kind: 'POSITION',
-      priority: 7,
+      kind: 'POSITION_GROUP',
       createdAt: new Date('2026-01-01T00:00:00Z'),
     })
   })
 
   it('convierte created_at a Date para que el desempate funcione', () => {
-    expect(toCandidate({ ...base, position_id: 'wing' }).createdAt).toBeInstanceOf(Date)
+    expect(toCandidate({ ...base, system_group_id: 'backs' }).createdAt).toBeInstanceOf(Date)
+  })
+
+  it('ya no expone priority: la columna se fue en 0019', () => {
+    expect(toCandidate({ ...base, player_id: 'pl1' })).not.toHaveProperty('priority')
   })
 })
