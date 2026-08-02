@@ -4,7 +4,7 @@ import type { PlayerWeekResponse } from '~~/generated'
 const { user } = useAuth()
 const api = usePlayerApi()
 
-const { data } = await useAsyncData('player-week', () =>
+const { data, error, refresh } = await useAsyncData('player-week', () =>
   api.get<PlayerWeekResponse>('/api/player/week'),
 )
 
@@ -38,7 +38,8 @@ function stateOf(day: Day) {
       <h1 class="text-lg font-bold text-navy-500 dark:text-highlighted">
         {{ week?.programName ?? 'Mi semana' }}
       </h1>
-      <UBadge v-if="week" color="neutral" variant="subtle" class="mt-1">
+      <!-- navy: contexto estructural (qué semana del programa), no un estado. -->
+      <UBadge v-if="week" color="navy" variant="subtle" class="mt-1">
         {{ week.weekName }}
       </UBadge>
     </div>
@@ -62,7 +63,21 @@ function stateOf(day: Day) {
       description="Cargalos en Mi perfil para ver los kg de cada serie."
     />
 
-    <UCard v-if="week === null && user?.coachId">
+    <!-- Un fetch fallido no es "no tenés programa": eso llevaría al jugador a
+         pensar que perdió su rutina en vez de que tiene mal el wifi del gimnasio. -->
+    <UCard v-if="error">
+      <div class="flex flex-col items-center gap-2 py-6 text-center">
+        <UIcon name="i-lucide-triangle-alert" class="size-8 text-error" />
+        <p class="text-sm text-muted">
+          No se pudo cargar tu semana. Revisá tu conexión y volvé a intentar.
+        </p>
+        <UButton color="neutral" variant="outline" size="sm" @click="() => refresh()">
+          Volver a intentar
+        </UButton>
+      </div>
+    </UCard>
+
+    <UCard v-else-if="week === null && user?.coachId">
       <div class="flex flex-col items-center gap-2 py-6 text-center">
         <UIcon name="i-lucide-calendar-x" class="size-8 text-muted" />
         <p class="text-sm text-muted">
@@ -91,6 +106,8 @@ function stateOf(day: Day) {
           <UBadge v-else-if="stateOf(day) === 'started'" color="primary" variant="subtle">
             {{ day.loggedCount }}/{{ day.totalCount }} registrados
           </UBadge>
+          <!-- Se deja neutral a propósito: "Sin empezar" es AUSENCIA de estado,
+               no un estado en sí. Pintarlo insinuaría algo que no pasó todavía. -->
           <UBadge v-else color="neutral" variant="subtle">Sin empezar</UBadge>
         </div>
 

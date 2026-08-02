@@ -7,20 +7,26 @@ const api = useCoachApi()
 const toast = useToast()
 const playerId = route.params.playerId as string
 
-const { data, error, refresh } = await useAsyncData(`coach-player-${playerId}`, () =>
+// Las tres cargas salen juntas: un `await` por cada una las encadenaba, y cada
+// request paga además el preámbulo de auth (docs/PERFORMANCE-F4.md).
+const playerAsync = useAsyncData(`coach-player-${playerId}`, () =>
   api.get<CoachPlayerResponse>(`/api/coach/players/${playerId}`),
 )
-
-const { data: catalog } = await useAsyncData('catalog-exercises', () =>
+const catalogAsync = useAsyncData('catalog-exercises', () =>
   api.get<ExercisesResponse>('/api/catalog/exercises'),
 )
+const evaluationsAsync = useAsyncData(`coach-evaluations-${playerId}`, () =>
+  api.get<{ evaluations: Evaluation[] }>(`/api/coach/players/${playerId}/evaluations`),
+)
+
+await Promise.all([playerAsync, catalogAsync, evaluationsAsync])
+
+const { data, error, refresh } = playerAsync
+const { data: catalog } = catalogAsync
 
 const exercises = computed(() => catalog.value?.exercises ?? [])
 
-const { data: evaluationsData, refresh: refreshEvaluations } = await useAsyncData(
-  `coach-evaluations-${playerId}`,
-  () => api.get<{ evaluations: Evaluation[] }>(`/api/coach/players/${playerId}/evaluations`),
-)
+const { data: evaluationsData, refresh: refreshEvaluations } = evaluationsAsync
 
 // --- puesto y medidas: autosave ---------------------------------------------
 
@@ -70,9 +76,23 @@ async function addRm() {
   }
 }
 
-async function removeRm(exerciseId: string) {
+const confirmingRm = ref<{ exerciseId: string; exerciseName: string } | null>(null)
+// UModal espera un boolean en v-model:open; el objeto guarda qué 1RM se borra.
+const confirmRmOpen = computed({
+  get: () => confirmingRm.value !== null,
+  set: (value: boolean) => {
+    if (!value) confirmingRm.value = null
+  },
+})
+const removingRm = ref(false)
+
+async function removeRm() {
+  if (!confirmingRm.value) return
+  removingRm.value = true
   try {
-    await api.del(`/api/coach/players/${playerId}/one-rm/${exerciseId}`)
+    await api.del(`/api/coach/players/${playerId}/one-rm/${confirmingRm.value.exerciseId}`)
+    toast.add({ title: '1RM borrado', color: 'success' })
+    confirmingRm.value = null
     await refresh()
   } catch (e) {
     toast.add({
@@ -80,6 +100,8 @@ async function removeRm(exerciseId: string) {
       description: e instanceof Error ? e.message : undefined,
       color: 'error',
     })
+  } finally {
+    removingRm.value = false
   }
 }
 
@@ -166,15 +188,17 @@ const formatDate = (iso: string) =>
         <ul v-if="data.oneRms.length > 0" class="divide-y divide-default">
           <li v-for="rm in data.oneRms" :key="rm.exerciseId" class="flex items-center gap-3 py-2">
             <span class="min-w-0 flex-1 truncate">{{ rm.exerciseName }}</span>
-            <span class="font-mono font-medium">{{ rm.kg }} kg</span>
-            <span class="hidden text-xs text-muted sm:block">{{ formatDate(rm.updatedAt) }}</span>
+            <div class="flex flex-col items-end leading-tight">
+              <span class="font-mono font-medium">{{ rm.kg }} kg</span>
+              <span class="text-xs text-muted">{{ formatDate(rm.updatedAt) }}</span>
+            </div>
             <UButton
               icon="i-lucide-trash-2"
               color="neutral"
               variant="ghost"
               size="xs"
               aria-label="Borrar"
-              @click="removeRm(rm.exerciseId)"
+              @click="() => { confirmingRm = { exerciseId: rm.exerciseId, exerciseName: rm.exerciseName } }"
             />
           </li>
         </ul>
@@ -211,5 +235,23 @@ const formatDate = (iso: string) =>
         @changed="() => refreshEvaluations()"
       />
     </template>
+
+    <UModal
+      v-model:open="confirmRmOpen"
+      :title="`¿Borrar el 1RM de ${confirmingRm?.exerciseName}?`"
+    >
+      <template #body>
+        <p class="text-sm text-muted">
+          Los ejercicios en porcentaje de este jugador para ese movimiento van a mostrarle el aviso
+          de 1RM faltante hasta que cargues uno nuevo. No se puede deshacer.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmingRm = null }">Cancelar</UButton>
+          <UButton color="error" :loading="removingRm" @click="removeRm">Borrar</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

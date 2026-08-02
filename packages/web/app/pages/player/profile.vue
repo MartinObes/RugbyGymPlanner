@@ -8,20 +8,27 @@ const api = usePlayerApi()
 const toast = useToast()
 const { user, refresh: refreshSession, changePassword } = useAuth()
 
-const { data, refresh } = await useAsyncData('player-profile', () =>
+// Las tres cargas salen juntas y no una atrás de otra: es la pantalla que abre
+// el jugador desde el celular, muchas veces con 4G flojo, y cada request paga
+// además el preámbulo de auth (docs/PERFORMANCE-F4.md).
+const profileAsync = useAsyncData('player-profile', () =>
   api.get<PlayerProfileResponse>('/api/player/profile'),
 )
-
 // ExerciseTypeahead no trae el catálogo: recibe la lista y emite el id.
-const { data: catalog } = await useAsyncData('catalog-exercises', () =>
+const catalogAsync = useAsyncData('catalog-exercises', () =>
   api.get<ExercisesResponse>('/api/catalog/exercises'),
 )
-const exercises = computed(() => catalog.value?.exercises ?? [])
-
-const { data: evaluationsData, refresh: refreshEvaluations } = await useAsyncData(
-  'player-evaluations',
-  () => api.get<{ evaluations: Evaluation[] }>('/api/player/evaluations'),
+const evaluationsAsync = useAsyncData('player-evaluations', () =>
+  api.get<{ evaluations: Evaluation[] }>('/api/player/evaluations'),
 )
+
+await Promise.all([profileAsync, catalogAsync, evaluationsAsync])
+
+const { data, refresh } = profileAsync
+const { data: catalog } = catalogAsync
+const { data: evaluationsData, refresh: refreshEvaluations } = evaluationsAsync
+
+const exercises = computed(() => catalog.value?.exercises ?? [])
 
 const positionItems = POSITIONS.map((p) => ({ label: p.name, value: p.id }))
 
@@ -90,6 +97,7 @@ async function removeOneRm(exerciseId: string) {
   try {
     await api.del(`/api/player/one-rms/${exerciseId}`)
     await refresh()
+    toast.add({ title: '1RM borrado' })
   } catch (error) {
     toast.add({
       title: 'No se pudo borrar',
@@ -237,6 +245,7 @@ async function submitPassword() {
               variant="ghost"
               icon="i-lucide-trash-2"
               size="xs"
+              :aria-label="`Borrar el 1RM de ${rm.exerciseName}`"
               @click="removeOneRm(rm.exerciseId)"
             />
           </span>

@@ -351,7 +351,7 @@ const loadOf = (exercise: {
       <template #footer>
         <div class="flex justify-end gap-2">
           <UButton color="neutral" variant="ghost" @click="() => { confirmOpen = false }">Cancelar</UButton>
-          <UButton color="warning" :loading="importing" @click="apply">Reemplazar</UButton>
+          <UButton color="error" :loading="importing" @click="apply">Reemplazar</UButton>
         </div>
       </template>
     </UModal>

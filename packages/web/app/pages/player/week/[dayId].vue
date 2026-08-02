@@ -9,7 +9,7 @@ const dayId = computed(() => String(route.params.dayId))
 
 // La misma key que la lista: Nuxt comparte el payload y navegar entre las dos no
 // vuelve a pedir la semana.
-const { data, refresh } = await useAsyncData('player-week', () =>
+const { data, error, refresh } = await useAsyncData('player-week', () =>
   api.get<PlayerWeekResponse>('/api/player/week'),
 )
 
@@ -91,7 +91,8 @@ async function reopen() {
         Mi semana
       </UButton>
       <h1 class="font-bold text-navy-500 dark:text-highlighted">{{ day.name }}</h1>
-      <UBadge color="neutral" variant="subtle" class="mt-1">{{ day.weekName }}</UBadge>
+      <!-- navy: contexto estructural (qué semana del programa), no un estado. -->
+      <UBadge color="navy" variant="subtle" class="mt-1">{{ day.weekName }}</UBadge>
     </div>
 
     <!-- Día cerrado: la franja de arriba lo dice y ofrece reabrir. Los bloques
@@ -176,10 +177,26 @@ async function reopen() {
     </UCard>
   </div>
 
+  <!-- Un fetch fallido no es "el día no existe": son cosas bien distintas para
+       alguien parado en el gimnasio con wifi flojo. -->
+  <UCard v-else-if="error">
+    <div class="flex flex-col items-center gap-2 py-6 text-center">
+      <UIcon name="i-lucide-triangle-alert" class="size-8 text-error" />
+      <p class="text-sm text-muted">
+        No se pudo cargar ese día. Revisá tu conexión y volvé a intentar.
+      </p>
+      <UButton color="neutral" variant="outline" size="sm" @click="() => refresh()">
+        Volver a intentar
+      </UButton>
+    </div>
+  </UCard>
+
   <UCard v-else>
     <p class="text-sm text-muted">
       No encontramos ese día en tu semana. Volvé a
-      <NuxtLink to="/player/week" class="text-primary underline">Mi semana</NuxtLink>.
+      <!-- dark:text-clubred-300: clubred-400 (vía text-primary) da 2.40:1 en
+           oscuro sobre el fondo de página, abajo del AA. El 300 da 5.07:1. -->
+      <NuxtLink to="/player/week" class="text-primary underline dark:text-clubred-300">Mi semana</NuxtLink>.
     </p>
   </UCard>
 </template>

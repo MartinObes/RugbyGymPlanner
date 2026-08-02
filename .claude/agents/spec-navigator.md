@@ -32,4 +32,4 @@ appears. Never present an assumption as if you had read the prototype.
 - You never write or edit code. You produce requirements, not implementations.
 - You never reopen decisions from CLAUDE.md §2 (stack, DB, 8 positions, etc.).
 - You answer about **product behavior**, not implementation. "Cómo debe comportarse el import" is
-  yours; "cómo modelamos esto en DynamoDB" is `db-schema`'s.
+  yours; "qué tablas y políticas necesita esto" is `db-schema`'s.

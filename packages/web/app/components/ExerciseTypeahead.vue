@@ -3,6 +3,25 @@ import { normName } from '@coachlab/core/domain/normName'
 
 export type ExerciseOption = { id: string; name: string; category: string | null }
 
+/**
+ * Buscador de ejercicios del catálogo.
+ *
+ * **Por qué es un UInputMenu y no una lista propia.** Antes esto era un `<input>`
+ * con un `<ul class="absolute">` escrito a mano, y el menú se RECORTABA: el
+ * editor de programas envuelve los días en `lg:overflow-x-auto`, y un elemento
+ * `absolute` no puede salirse de un ancestro con overflow. UInputMenu monta su
+ * contenido en un portal a `<body>` (Reka UI `ComboboxPortal`, `portal` viene en
+ * `true`), así que ningún contenedor que scrollee lo puede cortar.
+ *
+ * De paso vinieron gratis el manejo de teclado, los roles ARIA de combobox y el
+ * foco, que la versión casera implementaba a mano y sólo en parte.
+ *
+ * **Lo que NO cambió: el filtro sigue siendo `normName` del dominio.** Por eso va
+ * `ignore-filter`, que apaga el buscador propio de Nuxt UI. Es la misma función
+ * que decide el matching de 1RM, así que buscar "bulgara" encuentra "Sentadilla
+ * Búlgara" — con el filtro de fábrica, que compara sin normalizar acentos, no la
+ * encontraría.
+ */
 const props = defineProps<{
   modelValue: string | null
   exercises: ExerciseOption[]
@@ -11,91 +30,47 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [string | null] }>()
 
-const query = ref('')
-const open = ref(false)
-const highlighted = ref(0)
+const searchTerm = ref('')
 
-const selected = computed(() => props.exercises.find((e) => e.id === props.modelValue) ?? null)
-
-// El filtro usa normName DEL DOMINIO, no una reimplementación: es la misma
-// función que decide el matching de 1RM, así que buscar "bulgara" encuentra
-// "Sentadilla Búlgara".
 const filtered = computed(() => {
-  const q = normName(query.value)
-  const pool = q ? props.exercises.filter((e) => normName(e.name).includes(q)) : props.exercises
+  const query = normName(searchTerm.value)
+  const pool = query
+    ? props.exercises.filter((exercise) => normName(exercise.name).includes(query))
+    : props.exercises
+  // El tope existe para no renderizar 48 filas en un menú que se lee de un
+  // vistazo; escribiendo dos letras se llega a cualquiera.
   return pool.slice(0, 8)
 })
 
-watch(filtered, () => {
-  highlighted.value = 0
+/**
+ * El componente trabaja con el objeto y el padre con el id.
+ *
+ * `undefined` y no `null` cuando no hay nada: es lo que Nuxt UI entiende como
+ * "sin elegir", igual que USelect.
+ */
+const selected = computed({
+  get: () => props.exercises.find((exercise) => exercise.id === props.modelValue),
+  set: (option: ExerciseOption | undefined) => emit('update:modelValue', option?.id ?? null),
 })
-
-function choose(exercise: ExerciseOption) {
-  emit('update:modelValue', exercise.id)
-  query.value = ''
-  open.value = false
-}
-
-/** El blur cierra con delay para que el click en una opción llegue primero. */
-function closeSoon() {
-  setTimeout(() => {
-    open.value = false
-  }, 150)
-}
-
-function onKeydown(event: KeyboardEvent) {
-  if (!open.value) return
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    highlighted.value = Math.min(highlighted.value + 1, filtered.value.length - 1)
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    highlighted.value = Math.max(highlighted.value - 1, 0)
-  } else if (event.key === 'Enter') {
-    const option = filtered.value[highlighted.value]
-    if (option) {
-      event.preventDefault()
-      choose(option)
-    }
-  } else if (event.key === 'Escape') {
-    open.value = false
-  }
-}
 </script>
 
 <template>
-  <div class="relative">
-    <UInput
-      v-model="query"
-      :placeholder="selected?.name ?? placeholder ?? 'Buscar ejercicio…'"
-      class="w-full"
-      @focus="open = true"
-      @keydown="onKeydown"
-      @blur="closeSoon"
-    />
+  <UInputMenu
+    v-model="selected"
+    v-model:search-term="searchTerm"
+    :items="filtered"
+    label-key="name"
+    ignore-filter
+    :placeholder="placeholder ?? 'Buscar ejercicio…'"
+    icon="i-lucide-search"
+    class="w-full"
+  >
+    <template #item-trailing="{ item }">
+      <span v-if="item.category" class="text-xs text-muted">{{ item.category }}</span>
+    </template>
 
-    <ul
-      v-if="open && filtered.length > 0"
-      class="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-default bg-default shadow-lg"
-    >
-      <li
-        v-for="(exercise, index) in filtered"
-        :key="exercise.id"
-        :class="[
-          'cursor-pointer px-3 py-2 text-sm',
-          index === highlighted ? 'bg-elevated' : '',
-          exercise.id === modelValue ? 'font-medium text-primary' : '',
-        ]"
-        @mousedown.prevent="choose(exercise)"
-        @mouseenter="highlighted = index"
-      >
-        {{ exercise.name }}
-        <span v-if="exercise.category" class="ml-2 text-xs text-muted">{{ exercise.category }}</span>
-      </li>
-    </ul>
-
-    <p v-if="open && query && filtered.length === 0" class="absolute z-20 mt-1 w-full rounded-md border border-default bg-default px-3 py-2 text-sm text-muted shadow-lg">
-      No hay ejercicios que coincidan
-    </p>
-  </div>
+    <template #empty>
+      <span class="text-sm text-muted">No hay ejercicios que coincidan</span>
+    </template>
+  </UInputMenu>
 </template>

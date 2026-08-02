@@ -22,10 +22,16 @@
  * modo oscuro. tests/theme.test.ts lo verifica.
  */
 @theme static {
-  /* Rojo del club — `primary` y `warning`.
+  /* Rojo del club — `primary`. Desde el 2026-08-01 ya NO es también `warning`:
+     tenerlos los dos acá hacía que una advertencia saliera idéntica a un CTA
+     (DESIGN-SYSTEM §3.6).
      El 500 y el 400 son los dos rojos del mock: Nuxt UI usa el 500 como acento
      sólido en claro y el 400 en oscuro, así que la diferencia deliberada entre
-     modos sale de la escala sola, sin una sola clase `dark:`. */
+     modos sale de la escala sola, sin una sola clase `dark:`.
+     ⚠ El 400 sirve de FONDO sólido (con label blanco da 7.52:1) pero no de texto:
+     sobre el fondo oscuro #10152a queda en 2.40:1. Para texto acentuado en oscuro
+     va el 300 (5.07:1). El porqué de que ningún tono pueda las dos cosas está en
+     DESIGN-SYSTEM §3.7. */
   --color-clubred-50:  #fdf4f3;
   --color-clubred-100: #f8e6e5;  /* fondo del banner de atención */
   --color-clubred-200: #ecc9c8;  /* borde del banner */
@@ -38,7 +44,12 @@
   --color-clubred-900: #3d0f15;
   --color-clubred-950: #24080c;
 
-  /* Dorado — `success`: badge "Completada" y la flecha de mejora. */
+  /* Dorado — `warning` desde el 2026-08-01 (antes era `success`): "faltan tus
+     1RM", import con filas sin match. Además pinta, sin pasar por ningún alias,
+     el nombre y el filete izquierdo de cada bloque de la rutina.
+     ⚠ El dorado NO va nunca en un `solid`: el label blanco que Nuxt UI pone sobre
+     el 500 en claro da 3.16:1 y sobre el 400 en oscuro 2.41:1, los dos abajo del
+     4.5:1 de WCAG AA. `warning` va siempre `subtle`/`soft` (DESIGN-SYSTEM §3.6). */
   --color-gold-50:  #fdf9f0;
   --color-gold-100: #f6ecd3;  /* fondo del badge "Completada" */
   --color-gold-200: #ecd9ab;
@@ -50,6 +61,33 @@
   --color-gold-800: #6b4d20;
   --color-gold-900: #573f1c;
   --color-gold-950: #32230f;
+
+  /* Verde botella — `success`: badge "Completada", "N registrados", flecha de
+     mejora. Familia nueva del 2026-08-01, cuando el dueño del repo revirtió el
+     veto al verde de DESIGN-SYSTEM §3 para liberar el dorado y dárselo a
+     `warning`.
+
+     El argumento de identidad es de CROMA, no de tono. En CIELAB:
+
+       pitch-500    C = 28.5     ← más apagado que los dos colores del club
+       clubred-500  C = 42.3
+       gold-500     C = 46.0
+       green-500    C = 73.7     ← el verde de Tailwind, 2,6× el de este
+
+     Por eso el verde stock chirriaba y este no: no tiene con qué gritarle por
+     encima al marino ni al borgoña. Es un verde que se lee como estado —
+     "completado", "mejoró"— y que nunca le va a ganar de vista a un CTA. */
+  --color-pitch-50:  #f1f6f2;
+  --color-pitch-100: #dcebe1;  /* fondo del badge "Completada" en claro */
+  --color-pitch-200: #bcd8c6;
+  --color-pitch-300: #98c0a8;
+  --color-pitch-400: #7ab08c;  /* acento sólido en OSCURO — 7.24:1 sobre #10152a */
+  --color-pitch-500: #2f6b4f;  /* acento sólido en CLARO — label blanco a 6.29:1 */
+  --color-pitch-600: #265a42;
+  --color-pitch-700: #1f4936;
+  --color-pitch-800: #193b2c;
+  --color-pitch-900: #153025;
+  --color-pitch-950: #0b1a14;
 
   /* Marino — alias `navy`, registrado en nuxt.config. Estructura: peso prescrito,
      tarjeta del ring, acentos. NO es `primary`: ver DESIGN-SYSTEM §3.3. */
@@ -79,6 +117,42 @@
   --color-clay-800: #302d29;
   --color-clay-900: #1a1a1a;  /* texto principal */
   --color-clay-950: #111010;
+}
+
+/**
+ * Transición entre páginas (`app.pageTransition` en nuxt.config).
+ *
+ * Un fade con 4 px de desplazamiento: alcanza para que el ojo entienda que la
+ * pantalla cambió y no tanto como para que haya que esperarla. Nada de
+ * deslizamientos largos — la app se usa parado en el gimnasio, no se contempla.
+ */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+/**
+ * Movimiento reducido: no es una preferencia estética. Para quien tiene
+ * sensibilidad vestibular, el desplazamiento puede provocar mareo, así que se
+ * apaga el `transform` y queda sólo el fade — que sigue comunicando el cambio
+ * sin mover nada.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: opacity 80ms ease;
+  }
+
+  .page-enter-from,
+  .page-leave-to {
+    transform: none;
+  }
 }
 
 /**

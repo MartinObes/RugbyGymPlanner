@@ -19,13 +19,12 @@ const ICON = {
 
 const icon = computed(() => ICON[props.trend.direction as keyof typeof ICON] ?? null)
 
-// Dorado en claro, azul claro en oscuro (el dorado no hace falta ahí). El resto
-// de las direcciones, muted.
-const deltaClass = computed(() =>
-  props.trend.direction === 'up'
-    ? 'text-success dark:text-[#7ea6e8]'
-    : 'text-muted',
-)
+// Antes esto llevaba un `dark:text-[#7ea6e8]` hardcodeado porque `success` era
+// dorado, y el dorado no se leía sobre el fondo oscuro. Se resolvió cambiando
+// la paleta (success ahora es `pitch`, verde botella, 7.24:1 sobre el fondo de
+// página en oscuro) y no con un override por modo: `text-success` alcanza solo
+// en los dos modos. El resto de las direcciones, muted.
+const deltaClass = computed(() => (props.trend.direction === 'up' ? 'text-success' : 'text-muted'))
 
 /** "+8 kg", "-5 kg", "0 kg". El signo es parte del dato. */
 const delta = computed(() => {
