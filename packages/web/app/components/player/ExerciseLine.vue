@@ -56,15 +56,26 @@ const missing = computed(() => props.exercise.load.kind === 'missing-1rm')
            largo de "falta tu 1RM" baje en vez de empujar al chip. -->
       <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <!-- Mismo tamaño/peso que el peso normal (v-else): es el reemplazo del dato
-             más importante de la fila, no una nota al margen. Solo cambia el color. -->
-        <!-- `dark:text-clubred-300`: en oscuro el rojo del club (clubred-400 vía
+             más importante de la fila, no una nota al margen. Solo cambia el color.
+             `dark:text-clubred-300`: en oscuro el rojo del club (clubred-400 vía
              `text-primary`) da 2.40:1 sobre el fondo de página, abajo del 4.5:1
-             de WCAG AA. El 300 da 5.07:1. -->
+             de WCAG AA. El 300 da 5.07:1.
+
+             NO se usa `load.label` acá aunque exista: ese texto es
+             "70% — falta tu 1RM de Press Banca", y el nombre del ejercicio YA es
+             el título de esta misma fila. Repetirlo hacía tres renglones a 390 px,
+             empujaba las reps abajo y volvía al aviso lo más grande de la pantalla
+             — más que los kg del ejercicio de al lado. Visto en el browser el
+             2026-08-02. El label completo sí se usa donde no hay contexto: el
+             banner de arriba del día dice de qué ejercicio se trata. -->
         <p
           v-if="missing"
           class="text-lg font-bold text-primary dark:text-clubred-300"
         >
-          {{ exercise.load.label }}
+          <span v-if="exercise.load.percentage" class="font-normal text-muted">
+            {{ exercise.load.percentage }}% →
+          </span>
+          <span>falta tu 1RM</span>
         </p>
         <p v-else class="text-lg font-bold text-navy-500 dark:text-highlighted">
           <!-- En el modo porcentaje, el resultado en kg es lo que manda: el "80% →"
