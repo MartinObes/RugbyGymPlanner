@@ -125,36 +125,40 @@ describe('programSchema y weekSchema', () => {
 describe('assignmentSchema', () => {
   const uuid = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 
-  it('acepta exactamente un destino, en sus cuatro formas', () => {
+  it('acepta exactamente un destino, en sus tres formas', () => {
     expect(assignmentSchema.safeParse({ playerId: uuid }).success).toBe(true)
-    expect(assignmentSchema.safeParse({ positionId: 'wing' }).success).toBe(true)
     expect(assignmentSchema.safeParse({ systemGroupId: 'forwards' }).success).toBe(true)
     expect(assignmentSchema.safeParse({ positionGroupId: uuid }).success).toBe(true)
   })
 
   it('rechaza dos destinos a la vez — lo mismo que el CHECK de la base', () => {
-    expect(assignmentSchema.safeParse({ playerId: uuid, positionId: 'wing' }).success).toBe(false)
+    expect(
+      assignmentSchema.safeParse({ playerId: uuid, systemGroupId: 'forwards' }).success,
+    ).toBe(false)
   })
 
   it('rechaza cero destinos', () => {
     expect(assignmentSchema.safeParse({}).success).toBe(false)
   })
 
-  it('rechaza un positionId que no es una de las 8', () => {
-    expect(assignmentSchema.safeParse({ positionId: 'hooker' }).success).toBe(false)
-  })
-
   it('rechaza un systemGroupId inventado', () => {
     expect(assignmentSchema.safeParse({ systemGroupId: 'centros' }).success).toBe(false)
   })
 
-  it('priority por defecto es 0', () => {
-    expect(assignmentSchema.parse({ positionId: 'wing' }).priority).toBe(0)
+  it('el puesto ya no es un destino: un positionId solo no alcanza', () => {
+    // F4-B §2.2: un puesto suelto se modela como grupo custom de una posición.
+    // Zod descarta la clave desconocida y el refine ve cero destinos.
+    expect(assignmentSchema.safeParse({ positionId: 'wing' }).success).toBe(false)
   })
 
-  it('acota la prioridad: un override enorme daría vuelta la matriz entera', () => {
-    expect(assignmentSchema.safeParse({ positionId: 'wing', priority: -50 }).success).toBe(true)
-    expect(assignmentSchema.safeParse({ positionId: 'wing', priority: 9999 }).success).toBe(false)
-    expect(assignmentSchema.safeParse({ positionId: 'wing', priority: -9999 }).success).toBe(false)
+  it('un positionId de mas no ensucia un destino valido', () => {
+    const result = assignmentSchema.safeParse({ playerId: uuid, positionId: 'wing' })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data).not.toHaveProperty('positionId')
+  })
+
+  it('priority ya no existe: se descarta en vez de romper al cliente viejo', () => {
+    const parsed = assignmentSchema.parse({ playerId: uuid, priority: 50 })
+    expect(parsed).not.toHaveProperty('priority')
   })
 })

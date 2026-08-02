@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { isPositionId } from '../domain/positions'
 
 const name = (max: number) => z.string().trim().min(1, 'Poné un nombre').max(max)
 
@@ -86,28 +85,33 @@ export const blockExerciseSchema = z
 export type BlockExerciseInput = z.infer<typeof blockExerciseSchema>
 
 /**
- * Espejo del CHECK program_assignments_one_target (0001).
+ * Espejo del CHECK program_assignments_one_target (0019).
  *
- * `priority` va acotada a propósito: la columna es un integer sin cota, y un
- * override de 2^31-1 daría vuelta la matriz entera de resolveProgram.
+ * Tres destinos desde F4-B §2.2, no cuatro: el puesto salió como destino porque
+ * un grupo custom de una sola posición hace exactamente lo mismo y ya existía.
+ * El puesto del jugador sigue viviendo en profiles.position_id — es lo que
+ * decide su grupo system y qué grupos custom lo contienen.
+ *
+ * `priority` también se fue (F4-B §2.1): gana la última asignada, así que no hay
+ * matriz que dar vuelta. Zod descarta las claves desconocidas, así que un
+ * cliente viejo que todavía mande `priority` o `positionId` no rompe: el campo
+ * se cae solo y el refine lo agarra si era el único destino.
  */
 export const assignmentSchema = z
   .object({
     playerId: z.string().uuid().nullish(),
-    positionId: z.string().refine(isPositionId, 'Puesto inválido').nullish(),
     systemGroupId: z.enum(['forwards', 'backs']).nullish(),
     positionGroupId: z.string().uuid().nullish(),
-    priority: z.number().int().min(-100).max(500).default(0),
   })
   .superRefine((data, ctx) => {
-    const targets = [data.playerId, data.positionId, data.systemGroupId, data.positionGroupId].filter(
+    const targets = [data.playerId, data.systemGroupId, data.positionGroupId].filter(
       (t) => t != null,
     )
     if (targets.length !== 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['playerId'],
-        message: 'Elegí exactamente un destino: jugador, puesto, grupo del sistema o grupo custom',
+        message: 'Elegí exactamente un destino: jugador, grupo del sistema o grupo custom',
       })
     }
   })
