@@ -14,11 +14,22 @@ import { describe, expect, it } from 'vitest'
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 
 const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
-const PALETTES = ['clubred', 'gold', 'navy', 'clay']
+// `pitch` (verde botella) entró el 2026-08-01 con la reasignación de alias de
+// docs/DESIGN-SYSTEM.md §3.6. Sumarla acá le exige los 11 tonos igual que a las
+// otras cuatro, y obliga a sumarla también al regex de abajo.
+const PALETTES = ['clubred', 'gold', 'navy', 'clay', 'pitch']
 
 const css = readFileSync(join(ROOT, 'app/assets/css/main.css'), 'utf8')
 const appConfig = readFileSync(join(ROOT, 'app/app.config.ts'), 'utf8')
 const nuxtConfig = readFileSync(join(ROOT, 'nuxt.config.ts'), 'utf8')
+
+/**
+ * Lo mismo pero SIN comentarios, para los tests que buscan la ausencia de algo.
+ * `app.config.ts` documenta la configuración vieja ("antes era `warning:
+ * 'clubred'`"), y un test que mire el archivo crudo lee esa cita como si fuera
+ * código y falla sin que haya nada roto.
+ */
+const appConfigCode = appConfig.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 
 describe('las paletas del club', () => {
   for (const palette of PALETTES) {
@@ -29,7 +40,7 @@ describe('las paletas del club', () => {
   }
 
   it('cada tono es un hex de 6 dígitos', () => {
-    const declarations = [...css.matchAll(/--color-(?:clubred|gold|navy|clay)-\d+:\s*([^;]+);/g)]
+    const declarations = [...css.matchAll(/--color-(?:clubred|gold|navy|clay|pitch)-\d+:\s*([^;]+);/g)]
     expect(declarations.length).toBe(PALETTES.length * SHADES.length)
     const bad = declarations.filter((m) => !/^#[0-9a-f]{6}$/i.test(m[1]!.trim()))
     expect(bad.map((m) => m[0]), 'hay tonos que no son un hex de 6 dígitos').toEqual([])
@@ -43,9 +54,20 @@ describe('el mapeo de alias', () => {
     expect(appConfig).toMatch(/primary:\s*'clubred'/)
   })
 
-  it('success es dorado y warning el rojo del club', () => {
-    expect(appConfig).toMatch(/success:\s*'gold'/)
-    expect(appConfig).toMatch(/warning:\s*'clubred'/)
+  it('success es el verde botella y warning el dorado', () => {
+    // Reasignados el 2026-08-01. Antes `warning` era 'clubred', el MISMO color
+    // que `primary`: una advertencia salía pintada igual que un CTA. Si alguien
+    // vuelve a apuntar los dos a la misma paleta, este test lo agarra.
+    expect(appConfig).toMatch(/success:\s*'pitch'/)
+    expect(appConfig).toMatch(/warning:\s*'gold'/)
+  })
+
+  it('ningún alias comparte paleta con primary', () => {
+    // La causa raíz del hallazgo A de §3.6, escrita como invariante y no como
+    // recordatorio: `primary` es clubred y nadie más puede serlo.
+    const others = [...appConfigCode.matchAll(/\b(success|warning|info|secondary|error|neutral):\s*'(\w+)'/g)]
+    const clashing = others.filter(([, , palette]) => palette === 'clubred').map(([, alias]) => alias)
+    expect(clashing, `estos alias resuelven al mismo borgoña que primary: ${clashing.join(', ')}`).toEqual([])
   })
 
   it('error se queda en el rojo de Tailwind', () => {
@@ -87,9 +109,9 @@ describe('la 4ª divergencia: el label del solid en oscuro', () => {
   // sin esto el label queda en 2.31:1 y 2.59:1, abajo del 4.5:1 de WCAG AA.
   // Medido en pantalla el 2026-07-31. Ver docs/DESIGN-SYSTEM.md §3.5.
   for (const component of ['button', 'badge']) {
-    it(`${component} lleva dark:text-white en primary, warning y navy`, () => {
+    it(`${component} lleva dark:text-white en primary y navy`, () => {
       const block = appConfig.slice(appConfig.indexOf(`${component}: {`))
-      for (const color of ['primary', 'warning', 'navy']) {
+      for (const color of ['primary', 'navy']) {
         expect(
           block,
           `falta el override de ${color} en ${component}`,
@@ -98,11 +120,15 @@ describe('la 4ª divergencia: el label del solid en oscuro', () => {
     })
   }
 
-  it('gold y error NO lo llevan: son claros y el blanco los rompería', () => {
-    // gold-400 y red-400 con texto oscuro dan 7.21:1 y 6.29:1. Con blanco
-    // caerían a 2.41:1 y 2.77:1 — el override sería un downgrade.
-    for (const color of ['success', 'error']) {
-      expect(appConfig).not.toMatch(
+  it('success, warning y error NO lo llevan: el blanco los rompería', () => {
+    // pitch-400, gold-400 y red-400 con el texto oscuro que pone Nuxt UI dan
+    // 6.98:1, 7.21:1 y 6.29:1. Con blanco caerían a 2.50:1, 2.41:1 y 2.77:1.
+    //
+    // `warning` está en esta lista desde el 2026-08-01: mientras fue 'clubred'
+    // el override era correcto, y al pasar a 'gold' se volvió un fallo de AA que
+    // no rompe nada visible. Este test es lo que impide que vuelva.
+    for (const color of ['success', 'warning', 'error']) {
+      expect(appConfigCode).not.toMatch(
         new RegExp(`color:\\s*'${color}',\\s*variant:\\s*'solid',\\s*class:\\s*'dark:text-white'`),
       )
     }

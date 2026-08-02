@@ -31,8 +31,36 @@ export default defineAppConfig({
       // ESTAS DOS COSAS juntas no existe `--ui-navy` y `color="navy"` no anda.
       navy: 'navy',
 
-      success: 'gold',
-      warning: 'clubred',
+      /**
+       * `secondary` e `info` se mapean aunque hoy NADIE los use.
+       *
+       * `nuxt.config.ts` los declara en `ui.theme.colors`, así que las variables
+       * existen; sin mapearlos acá resuelven al default de Nuxt UI, que no es
+       * ninguna paleta del club. O sea: el primero que escriba `color="info"`
+       * mete un color ajeno a la marca sin que falle nada. Apuntarlos a `navy`
+       * los vuelve inofensivos por default.
+       */
+      secondary: 'navy',
+      info: 'navy',
+
+      /**
+       * Reasignados el 2026-08-01 (docs/DESIGN-SYSTEM.md §3.6).
+       *
+       * Antes eran `success: 'gold'` y `warning: 'clubred'`, o sea que `warning`
+       * y `primary` resolvían al MISMO borgoña: el banner "faltan tus 1RM" salía
+       * pintado igual que el botón "Completar día" y una advertencia se leía como
+       * una acción sugerida. Un problema de señal, no de gusto.
+       *
+       * `warning` se lleva el dorado y `success` estrena `pitch`, el verde
+       * botella de main.css. El verde estaba vetado en §3 y el dueño del repo
+       * revirtió el veto: `pitch-500` tiene menos croma (28.5) que el rojo del
+       * club (42.3) y que el dorado (46.0), así que no le compite a la identidad.
+       *
+       * ⚠ `warning` va SIEMPRE en `subtle`/`soft`, nunca en `solid`: el label
+       *   blanco sobre `gold-500` da 3.16:1, abajo de WCAG AA.
+       */
+      success: 'pitch',
+      warning: 'gold',
 
       // El único que NO va a la paleta del club, a propósito: un error tiene que
       // leerse como error aunque el club juegue de rojo. En el panel del coach
@@ -54,14 +82,20 @@ export default defineAppConfig({
      *
      * Con texto blanco esos mismos fondos dan 7.52:1 y 6.72:1.
      *
-     * `gold` y `error` NO van acá a propósito: gold-400 (#c8a15a) y red-400
-     * (#f87171) sí son claros, y con texto oscuro dan 7.21:1 y 6.29:1. Ponerles
-     * blanco los rompería (2.41:1 y 2.77:1).
+     * La lista es EXACTAMENTE `primary` y `navy`, y quién queda afuera importa
+     * tanto como quién entra. `success` (pitch-400 #7ab08c), `warning` (gold-400
+     * #c8a15a) y `error` (red-400 #f87171) sí son claros de verdad: con el texto
+     * oscuro que pone Nuxt UI dan 6.98:1, 7.21:1 y 6.29:1. Ponerles blanco los
+     * ROMPERÍA — 2.50:1, 2.41:1 y 2.77:1.
+     *
+     * `warning` estaba en esta lista hasta el 2026-08-01, cuando era `clubred` y
+     * correspondía. Se sacó en el mismo cambio que lo pasó a `gold`: dejarlo
+     * habría dejado texto blanco sobre dorado a 2.41:1, un fallo de AA que no
+     * rompe el build ni ningún test que no lo busque.
      */
     button: {
       compoundVariants: [
         { color: 'primary', variant: 'solid', class: 'dark:text-white' },
-        { color: 'warning', variant: 'solid', class: 'dark:text-white' },
         { color: 'navy', variant: 'solid', class: 'dark:text-white' },
       ],
       /**
@@ -79,10 +113,11 @@ export default defineAppConfig({
         },
       },
     },
+    // Misma lista que el botón y por la misma razón: sólo las paletas del club
+    // que siguen siendo OSCURAS en su tono 400. Ver el comentario de arriba.
     badge: {
       compoundVariants: [
         { color: 'primary', variant: 'solid', class: 'dark:text-white' },
-        { color: 'warning', variant: 'solid', class: 'dark:text-white' },
         { color: 'navy', variant: 'solid', class: 'dark:text-white' },
       ],
     },
