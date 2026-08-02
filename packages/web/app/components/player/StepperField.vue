@@ -105,8 +105,11 @@ const placeholder = computed(() =>
     <div class="mb-1.5 flex items-baseline justify-between">
       <p class="text-xs text-muted">{{ label }}</p>
       <!-- Decir de dónde sale el número gris. Sin esto parece un valor guardado. -->
+      <!-- El espacio va en la interpolación y no como texto suelto entre tags:
+           Vue condensa el whitespace del template y renderizaba "112kg". Visto
+           en el browser el 2026-08-02. -->
       <p v-if="fallback !== null && fallback !== undefined" class="text-[11px] text-dimmed">
-        plan: {{ fallback }}<span v-if="unit"> {{ unit }}</span>
+        plan: {{ unit ? `${fallback} ${unit}` : fallback }}
       </p>
     </div>
 

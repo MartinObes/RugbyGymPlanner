@@ -72,7 +72,15 @@ const TABS: { to: string; label: string; icon: string; exact?: true }[] = [
 // dark:border-clubred-300 / dark:text-clubred-300: en oscuro clubred-400 (vía
 // border-primary/text-primary) da 2.40:1 sobre el fondo de página, abajo del
 // 4.5:1 de WCAG AA. El tono 300 da 5.07:1.
-const ACTIVE_TAB = 'border-primary font-medium text-primary dark:border-clubred-300 dark:text-clubred-300'
+//
+// El `!` del borde NO es decorativo: la clase base del link lleva
+// `border-transparent`, que tiene la MISMA especificidad que `border-primary`,
+// así que gana la que Tailwind emita después en la hoja — y ganaba la
+// transparente. El tab activo quedaba sin subrayado, distinguido sólo por el
+// color del texto. Medido en el browser el 2026-08-02: borderBottomColor era
+// `rgba(0, 0, 0, 0)` estando activo.
+const ACTIVE_TAB =
+  '!border-primary font-medium text-primary dark:!border-clubred-300 dark:text-clubred-300'
 </script>
 
 <template>
