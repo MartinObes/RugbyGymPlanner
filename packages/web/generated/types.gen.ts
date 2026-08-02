@@ -153,11 +153,8 @@ export type CreatedRow = {
 
 export type Assignment = {
     id: string;
-    kind: 'PLAYER' | 'POSITION_GROUP' | 'SYSTEM_GROUP' | 'POSITION';
+    kind: 'PLAYER' | 'POSITION_GROUP' | 'SYSTEM_GROUP';
     targetName: string;
-    basePriority: number;
-    priority: number;
-    totalPriority: number;
     createdAt: string;
 };
 
@@ -172,11 +169,69 @@ export type AssignmentPreviewRow = {
     positionId: string | null;
     programId: string | null;
     programName: string | null;
+    assignedProgramId: string | null;
+    assignedProgramName: string | null;
 };
 
 export type AssignmentPreviewResponse = {
     ok: true;
     rows: Array<AssignmentPreviewRow>;
+};
+
+export type PlayerFeedback = {
+    playerId: string;
+    playerName: string;
+    positionId: string | null;
+    programName: string | null;
+    weekName: string | null;
+    daysDone: number;
+    daysTotal: number;
+    rpe: {
+        comparable: number;
+        averageDelta: number | null;
+        ok: number;
+        heavy: number;
+        light: number;
+    };
+    lastNote: {
+        dayName: string;
+        note: string;
+    } | null;
+};
+
+export type FeedbackListResponse = {
+    ok: true;
+    players: Array<PlayerFeedback>;
+};
+
+export type PlayerFeedbackDetail = PlayerFeedback & {
+    days: Array<{
+        dayId: string;
+        dayName: string;
+        completedAt: string | null;
+        targetRpe: number | null;
+        perceivedRpe: number | null;
+        comparison: {
+            delta: number | null;
+            severity: 'ok' | 'heavy' | 'light' | 'unknown';
+            label: string;
+        };
+        note: string | null;
+        exercises: Array<{
+            blockExerciseId: string;
+            exerciseName: string;
+            sets: number | null;
+            reps: string | null;
+            targetRpe: number | null;
+            weight: number | null;
+            loggedReps: number | null;
+        }>;
+    }>;
+};
+
+export type FeedbackDetailResponse = {
+    ok: true;
+    player: PlayerFeedbackDetail;
 };
 
 export type ImportResponse = {
@@ -242,6 +297,18 @@ export type PlayerWeekResponse = {
 
 export type PlayerWeekOkResponse = {
     ok: true;
+};
+
+export type PlayerProgram = {
+    programId: string;
+    name: string;
+    assignedAt: string;
+    current: boolean;
+};
+
+export type PlayerProgramsResponse = {
+    ok: true;
+    programs: Array<PlayerProgram>;
 };
 
 export type PlayerProfile = {
@@ -1386,10 +1453,8 @@ export type GetApiCoachProgramsByProgramIdAssignmentsResponse = GetApiCoachProgr
 export type PostApiCoachProgramsByProgramIdAssignmentsData = {
     body?: {
         playerId?: string | null;
-        positionId?: string | null;
         systemGroupId?: 'forwards' | 'backs';
         positionGroupId?: string | null;
-        priority?: number;
     };
     path: {
         programId: string;
@@ -1480,6 +1545,62 @@ export type GetApiCoachAssignmentsPreviewResponses = {
 };
 
 export type GetApiCoachAssignmentsPreviewResponse = GetApiCoachAssignmentsPreviewResponses[keyof GetApiCoachAssignmentsPreviewResponses];
+
+export type GetApiCoachFeedbackData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/coach/feedback';
+};
+
+export type GetApiCoachFeedbackErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiCoachFeedbackError = GetApiCoachFeedbackErrors[keyof GetApiCoachFeedbackErrors];
+
+export type GetApiCoachFeedbackResponses = {
+    /**
+     * El plantel con su progreso
+     */
+    200: FeedbackListResponse;
+};
+
+export type GetApiCoachFeedbackResponse = GetApiCoachFeedbackResponses[keyof GetApiCoachFeedbackResponses];
+
+export type GetApiCoachFeedbackByPlayerIdData = {
+    body?: never;
+    path: {
+        playerId: string;
+    };
+    query?: never;
+    url: '/api/coach/feedback/{playerId}';
+};
+
+export type GetApiCoachFeedbackByPlayerIdErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * No existe o no es tuyo
+     */
+    404: ErrorResponse;
+};
+
+export type GetApiCoachFeedbackByPlayerIdError = GetApiCoachFeedbackByPlayerIdErrors[keyof GetApiCoachFeedbackByPlayerIdErrors];
+
+export type GetApiCoachFeedbackByPlayerIdResponses = {
+    /**
+     * El detalle
+     */
+    200: FeedbackDetailResponse;
+};
+
+export type GetApiCoachFeedbackByPlayerIdResponse = GetApiCoachFeedbackByPlayerIdResponses[keyof GetApiCoachFeedbackByPlayerIdResponses];
 
 export type PostApiCoachProgramsByProgramIdImportData = {
     body?: {
@@ -1667,6 +1788,64 @@ export type PostApiPlayerDaysByDayIdReopenResponses = {
 };
 
 export type PostApiPlayerDaysByDayIdReopenResponse = PostApiPlayerDaysByDayIdReopenResponses[keyof PostApiPlayerDaysByDayIdReopenResponses];
+
+export type GetApiPlayerProgramsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/player/programs';
+};
+
+export type GetApiPlayerProgramsErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+};
+
+export type GetApiPlayerProgramsError = GetApiPlayerProgramsErrors[keyof GetApiPlayerProgramsErrors];
+
+export type GetApiPlayerProgramsResponses = {
+    /**
+     * Rutinas
+     */
+    200: PlayerProgramsResponse;
+};
+
+export type GetApiPlayerProgramsResponse = GetApiPlayerProgramsResponses[keyof GetApiPlayerProgramsResponses];
+
+export type PutApiPlayerProgramsSelectedData = {
+    body?: {
+        programId: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/player/programs/selected';
+};
+
+export type PutApiPlayerProgramsSelectedErrors = {
+    /**
+     * Sin sesión o rol equivocado
+     */
+    401: ErrorResponse;
+    /**
+     * Esa rutina no te fue asignada
+     */
+    404: ErrorResponse;
+};
+
+export type PutApiPlayerProgramsSelectedError = PutApiPlayerProgramsSelectedErrors[keyof PutApiPlayerProgramsSelectedErrors];
+
+export type PutApiPlayerProgramsSelectedResponses = {
+    /**
+     * Elegida
+     */
+    200: {
+        ok: true;
+    };
+};
+
+export type PutApiPlayerProgramsSelectedResponse = PutApiPlayerProgramsSelectedResponses[keyof PutApiPlayerProgramsSelectedResponses];
 
 export type GetApiPlayerProfileData = {
     body?: never;

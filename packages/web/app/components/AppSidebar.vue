@@ -21,6 +21,8 @@ type NavItem = {
 // Solo páginas que existen.
 const NAV: Record<SessionUser['role'], NavItem[]> = {
   COACH: [
+    // Primero porque es la pantalla a la que el coach entra a MIRAR, no a editar.
+    { to: '/coach/feedback', label: 'Cómo viene el plantel', icon: 'i-lucide-activity' },
     { to: '/coach/players', label: 'Plantel', icon: 'i-lucide-users' },
     { to: '/coach/groups', label: 'Grupos', icon: 'i-lucide-layout-grid' },
     { to: '/coach/programs', label: 'Programas', icon: 'i-lucide-clipboard-list' },
