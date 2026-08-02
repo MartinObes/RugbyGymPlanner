@@ -351,13 +351,15 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
   > `2026-07-31-f4b-assignment-model-design.md`; plan en
   > `docs/superpowers/plans/2026-08-02-f4-assignments-and-feedback.md`.
   >
+  > **RLS verificada contra la base real el 2026-08-02**: `verify:setup` **87/87** y `smoke:player`
+  > **32/32**, corridos por el dueño del repo con la `service_role` en el entorno. Es lo que confirma que
+  > la reescritura de `program_reaches_me()` en `0019` —`security definer`, la usan las políticas de
+  > RLS— no rompió la capa 1 de §4. Ningún test de código lo cubre.
+  >
   > **Falta para cerrar la fase**, y no lo puede hacer un agente:
-  > 1. **`pnpm verify:setup` y `pnpm smoke:player`** con la `service_role` en el entorno. La migración
-  >    `0019` reescribió `program_reaches_me()`, que es `security definer` y **la usan las políticas de
-  >    RLS** — la capa 1 de §4. Ningún test de código lo cubre.
-  > 2. **El keepalive de UptimeRobot** contra `/health`, cada 5 minutos (Supabase pausa un proyecto free
+  > 1. **El keepalive de UptimeRobot** contra `/health`, cada 5 minutos (Supabase pausa un proyecto free
   >    a los 7 días sin actividad de base).
-  > 3. **El click-through** de las pantallas nuevas con sesión real.
+  > 2. **El click-through** de las pantallas nuevas con sesión real.
   >
   > **Decisión pendiente:** cómo recupera la contraseña un jugador que se la olvidó. Resetear la de OTRO usuario exige la `service_role`, que §4 prohíbe en un request, así que no es "agregar un botón": las tres opciones y sus riesgos están en `docs/IMPLEMENTATION-F2.md` §5.5 B. Hoy el camino es `pnpm set:password`.
 
