@@ -99,7 +99,7 @@ Todo en el schema `public`, snake_case, ids `uuid` con `gen_random_uuid()` salvo
 
 | Tabla | Claves | Notas |
 |---|---|---|
-| **profiles** | `id` PK → `auth.users(id)` ON DELETE CASCADE | `email, name, role`; si COACH además `invite_code` UNIQUE; si PLAYER además `coach_id → profiles(id)`, `position_id`, `height_cm`, `weight_kg` |
+| **profiles** | `id` PK → `auth.users(id)` ON DELETE CASCADE | `email, name, role`; si COACH además `invite_code` UNIQUE; si PLAYER además `coach_id → profiles(id)`, `position_id`, `height_cm`, `weight_kg`, `selected_program_id → programs` ON DELETE SET NULL |
 | **exercises** | `id` PK, `normalized_name` UNIQUE | Catálogo global. `normalized_name` es la clave del matching de 1RM |
 | **one_rms** | PK `(player_id, exercise_id)` | El 1RM vigente |
 | **evaluations** | `id` PK | Historial de tests. Sin UI en el MVP |
@@ -110,7 +110,7 @@ Todo en el schema `public`, snake_case, ids `uuid` con `gen_random_uuid()` salvo
 | **block_exercises** | `id` PK, `block_id → blocks` CASCADE, `exercise_id → exercises` | `load_type`, `weight`, `percentage`, `sets`, `reps`, `target_rpe`, `order_index` |
 | **position_groups** | `id` PK, `coach_id → profiles` | Solo grupos custom |
 | **position_group_positions** | PK `(group_id, position_id)` | Qué puestos contiene un grupo custom |
-| **program_assignments** | `id` PK, `program_id → programs` CASCADE | Cuatro columnas de destino mutuamente excluyentes + `priority`, `created_at` |
+| **program_assignments** | `id` PK, `program_id → programs` CASCADE | **Tres** columnas de destino mutuamente excluyentes + `created_at` (que es lo que decide: gana la última) |
 | **session_logs** | `id` PK, UNIQUE `(player_id, day_id)` | `note`, `perceived_rpe` (el RPE del día, nullable), `completed_at` |
 | **exercise_entries** | `id` PK, UNIQUE `(session_log_id, block_exercise_id)` | `weight`, `reps`, `rpe` |
 
@@ -139,23 +139,24 @@ CHECK (
 **Assignment con exactamente un destino** en `program_assignments`:
 
 ```sql
-CHECK (num_nonnulls(player_id, position_id, system_group_id, position_group_id) = 1)
+CHECK (num_nonnulls(player_id, system_group_id, position_group_id) = 1)
 ```
 
-Los cuatro destinos son: un jugador, un puesto, un grupo system (`'forwards'`/`'backs'`, texto porque son constantes de código) y un grupo custom.
+Los tres destinos son: un jugador, un grupo system (`'forwards'`/`'backs'`, texto porque son constantes de código) y un grupo custom. **El puesto dejó de ser destino en F4-B** (migración `0019`): un grupo custom de una sola posición hace lo mismo y ya existía.
 
 **Rol válido** en `profiles`: `CHECK (role IN ('PLAYER','COACH','ADMIN'))`.
 
 ### Reglas de negocio críticas
 
-**Resolución del programa activo de un jugador** (reemplaza al `playerProgram()` del prototipo — individual pisa grupo pisa puesto):
+**Resolución del programa activo de un jugador** (reemplaza al `playerProgram()` del prototipo):
 
-1. Assignment a PLAYER → prioridad base 100
-2. Assignment a POSITION_GROUP custom que contiene su posición → 50
-3. Assignment a POSITION_GROUP system (Forwards/Backs) → 30
-4. Assignment a POSITION → 10
+> **Gana la última asignada:** el assignment con el `created_at` más reciente entre los que alcanzan al jugador. Empate exacto: gana el primero, para que el resultado no dependa del orden en que vuelvan las filas.
 
-Gana la mayor (base + `priority` override). Empate: `created_at` más reciente.
+Los destinos son **tres**: un jugador, un grupo system (Forwards/Backs) y un grupo custom. **El puesto no es un destino**: un puesto suelto se modela como grupo custom de una sola posición. `profiles.position_id` sigue existiendo y sigue decidiendo a qué grupo system pertenece y qué grupos custom lo contienen.
+
+**La elección del jugador** (`profiles.selected_program_id`): si lo alcanza más de un programa, puede volver a otro de los suyos. `null` significa "la última asignada", **no** "ninguna". Vale **sólo mientras ese programa siga alcanzándolo** —quitarle el assignment, cambiarle el puesto o sacarlo del grupo la invalidan, y de ninguna de las tres se entera la FK—, así que se valida al leer y ante una elección inválida se degrada al default en vez de romper el render. Se resetea sola cuando el coach asigna algo nuevo que lo alcanza (trigger `reset_selected_program`, migración `0019`): la prescripción del coach siempre gana.
+
+> Esto reemplaza la resolución por prioridad de cuatro niveles con `priority` override, borrada en F4-B. El caso real que la mató: "este jugador se lesionó, lo paso a la rutina de lesionados" es una acción con una intención obvia, y exigía razonar si 50 + override le ganaba a 100. Diseño completo en `docs/superpowers/specs/2026-07-31-f4b-assignment-model-design.md`.
 
 **Cómo se implementa, y por qué así:** la query trae los assignments *candidatos*, y **la elección del ganador la hace una función pura** en `packages/core/src/domain/resolveProgram.ts`. Se podría resolver entero en SQL con un `ORDER BY ... LIMIT 1`, pero entonces la regla de negocio viviría en un string y solo se podría testear con una base levantada. Con esta división la regla se testea en milisegundos y vive en un solo lugar (§5).
 
@@ -164,7 +165,6 @@ La query de candidatos:
 ```sql
 select a.* from program_assignments a
 where a.player_id = $playerId
-   or a.position_id = $positionId
    or a.system_group_id = $systemGroupId
    or a.position_group_id in (
         select group_id from position_group_positions where position_id = $positionId
@@ -344,6 +344,21 @@ Los planes detallados de cada fase están en `docs/superpowers/plans/`.
   > ~10 pantallas del coach con la paleta nueva (items 3, 4, 5 y 7 de
   > `docs/IMPLEMENTATION-F3.5.md` §6.1). **Es lo primero que hay que hacer en F4.**
 - [ ] **F4 — Loop de feedback + deploy**: vista coach con progreso "2/3 días" y **el RPE del día (`session_logs.perceived_rpe`) contra los `target_rpe` del día**, con notas; keepalive de UptimeRobot; dominio propio si se quiere.
+  > **El código está hecho** en `feature/f4-feedback`, con los tres gates en verde (488 tests). Cubre la
+  > vista de feedback del coach (listado con "2/3 días" + detalle por día con la nota y el RPE) y F4-B,
+  > el modelo de asignación nuevo (gana la última asignada, tres destinos, elección del jugador).
+  > Diseño en `docs/superpowers/specs/2026-08-02-f4-coach-feedback-design.md` y
+  > `2026-07-31-f4b-assignment-model-design.md`; plan en
+  > `docs/superpowers/plans/2026-08-02-f4-assignments-and-feedback.md`.
+  >
+  > **Falta para cerrar la fase**, y no lo puede hacer un agente:
+  > 1. **`pnpm verify:setup` y `pnpm smoke:player`** con la `service_role` en el entorno. La migración
+  >    `0019` reescribió `program_reaches_me()`, que es `security definer` y **la usan las políticas de
+  >    RLS** — la capa 1 de §4. Ningún test de código lo cubre.
+  > 2. **El keepalive de UptimeRobot** contra `/health`, cada 5 minutos (Supabase pausa un proyecto free
+  >    a los 7 días sin actividad de base).
+  > 3. **El click-through** de las pantallas nuevas con sesión real.
+  >
   > **Decisión pendiente:** cómo recupera la contraseña un jugador que se la olvidó. Resetear la de OTRO usuario exige la `service_role`, que §4 prohíbe en un request, así que no es "agregar un botón": las tres opciones y sus riesgos están en `docs/IMPLEMENTATION-F2.md` §5.5 B. Hoy el camino es `pnpm set:password`.
 
 ---

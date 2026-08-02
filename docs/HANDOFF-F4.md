@@ -3,6 +3,19 @@
 > Escrito el **2026-08-02** para que otra sesión siga sin re-derivar nada.
 > Leé `CLAUDE.md` entero primero; esto es el delta, no un reemplazo.
 
+> ## ⚠ Estado al 2026-08-02, después de este handoff
+>
+> **Los pasos 2 y 5 ya están hechos** en la rama `feature/f4-feedback`, con los tres gates en verde
+> (488 tests). O sea: la vista de feedback del coach existe, y el modelo de asignación de F4-B también.
+>
+> **Lo que sigue faltando** son los pasos 1, 3, 4 y 6 —que son del dueño del repo— más una verificación
+> que ningún agente puede correr: **`pnpm verify:setup` y `pnpm smoke:player` con la `service_role` en
+> el entorno**. La migración `0019` reescribió `program_reaches_me()`, que es `security definer` y la
+> usan las políticas de RLS; si quedó mal, se rompe la capa 1 de `CLAUDE.md` §4 y **no lo agarra ningún
+> test de código**.
+>
+> Las correcciones a lo que este documento decía mal están marcadas en línea, abajo.
+
 ---
 
 ## 1. El estado en una frase
@@ -75,8 +88,16 @@ Piezas:
    dos **no comparten estado**, así que van como hermanas con `index.vue`, no como padre/hijo.
 3. **Tests de scoping** — un coach no ve el feedback de un plantel ajeno, y eso da **404, no 403**.
 
-**No escribas la comparación de RPE**: `rpeDelta` ya existe en `packages/core/src/domain/` y está
-testeada. La ruta trae los datos y el dominio decide.
+> ⚠ **CORRECCIÓN (2026-08-02).** Esta sección decía "no escribas la comparación de RPE: `rpeDelta` ya
+> existe en `packages/core/src/domain/` y está testeada". **Era falso** — el archivo no existía. El spec
+> de F3 lo decía bien: "`rpeDelta` se escribe en F4, donde se usa". Ya está escrito, con 18 tests.
+>
+> Y el modelo que asumía el plan viejo tampoco valía: **el RPE percibido es del DÍA desde F3.5**, no del
+> ejercicio (`CLAUDE.md` §1). No se puede poner un badge por fila de ejercicio porque no hay contra qué
+> compararlo. El objetivo del día es el **promedio de los `target_rpe`** de sus ejercicios
+> (`dayTargetRpe`), y el badge va una vez por día.
+
+La ruta trae los datos y el dominio decide.
 
 **Corré `rbac-auditor` antes de mergear**: es una ruta nueva que toca datos de jugador.
 
