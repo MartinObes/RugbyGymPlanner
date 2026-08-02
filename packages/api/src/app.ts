@@ -13,6 +13,7 @@ import { tree } from './routes/coach/tree'
 import { health } from './routes/health'
 import { playerDashboard } from './routes/player/dashboard'
 import { playerEvaluations } from './routes/player/evaluations'
+import { playerPrograms } from './routes/player/programs'
 import { playerProfile } from './routes/player/profile'
 import { playerWeek } from './routes/player/week'
 
@@ -51,6 +52,7 @@ app.route('/', tree)
 app.route('/', assignments)
 app.route('/', programImport)
 app.route('/', playerWeek)
+app.route('/', playerPrograms)
 app.route('/', playerProfile)
 app.route('/', playerEvaluations)
 app.route('/', playerDashboard)
