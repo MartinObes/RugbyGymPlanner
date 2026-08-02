@@ -44,12 +44,20 @@ async function addBlock(type: 'SINGLE' | 'CIRCUIT') {
   }
 }
 
+const confirmRemoveOpen = ref(false)
+const removing = ref(false)
+
 async function removeDay() {
+  removing.value = true
   try {
     await api.del(`/api/coach/days/${props.day.id}`)
+    toast.add({ title: 'Día borrado', color: 'success' })
+    confirmRemoveOpen.value = false
     emit('changed')
   } catch (e) {
     toast.add({ title: 'No se pudo borrar el día', description: msg(e), color: 'error' })
+  } finally {
+    removing.value = false
   }
 }
 
@@ -59,14 +67,20 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : undefined)
 <template>
   <div class="w-full shrink-0 space-y-3 rounded-lg bg-elevated p-3 lg:w-96">
     <div class="flex items-center gap-2">
-      <UInput v-model="name" variant="ghost" class="flex-1 font-medium" @blur="saveName" />
+      <UInput
+        v-model="name"
+        variant="ghost"
+        class="flex-1 font-medium"
+        aria-label="Nombre del día"
+        @blur="saveName"
+      />
       <UButton
         icon="i-lucide-trash-2"
         color="neutral"
         variant="ghost"
         size="xs"
         aria-label="Borrar día"
-        @click="removeDay"
+        @click="() => { confirmRemoveOpen = true }"
       />
     </div>
 
@@ -86,5 +100,21 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : undefined)
         + Circuito
       </UButton>
     </div>
+
+    <UModal v-model:open="confirmRemoveOpen" :title="`¿Borrar ${day.name}?`">
+      <template #body>
+        <p class="text-sm text-muted">
+          Se borra el día con todos sus bloques y ejercicios. No se puede deshacer.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmRemoveOpen = false }">
+            Cancelar
+          </UButton>
+          <UButton color="error" :loading="removing" @click="removeDay">Borrar día</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

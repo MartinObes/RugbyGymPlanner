@@ -49,9 +49,14 @@ async function onSubmit(event: FormSubmitEvent<LoginInput>) {
     </UForm>
 
     <template #footer>
+      <!-- Este link es la ÚNICA navegación entre login y registro: en oscuro
+           clubred-400 (vía text-primary) da 2.40:1 sobre el fondo de página,
+           abajo del 4.5:1 de WCAG AA. dark:text-clubred-300 da 5.07:1. -->
       <p class="text-center text-sm text-muted">
         ¿No tenés cuenta?
-        <NuxtLink to="/register" class="font-medium text-primary">Registrate</NuxtLink>
+        <NuxtLink to="/register" class="font-medium text-primary dark:text-clubred-300">
+          Registrate
+        </NuxtLink>
       </p>
     </template>
   </UCard>

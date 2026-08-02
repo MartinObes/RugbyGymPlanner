@@ -37,8 +37,15 @@ const items = computed(() => (user.value ? NAV[user.value.role] : []))
 
 // El resaltado va por `active-class` (prefijo) o por `exact-active-class` según
 // el ítem; se define una vez para que las dos navs no se desincronicen.
-const ACTIVE_SIDEBAR = 'bg-elevated font-medium text-primary'
-const ACTIVE_TABBAR = 'text-primary'
+//
+// `dark:text-clubred-300`: en oscuro `--ui-primary` resuelve a clubred-400, que
+// da 2.40:1 sobre el fondo de página (#10152a) — abajo del 4.5:1 de WCAG AA. El
+// tono 300 da 5.07:1. No se puede arreglar pisando `--ui-primary` global (el
+// mismo hex no puede ser legible como relleno sólido CON label blanca Y como
+// texto a la vez, las ventanas de luminancia no se solapan), así que va por
+// usage.
+const ACTIVE_SIDEBAR = 'bg-elevated font-medium text-primary dark:text-clubred-300'
+const ACTIVE_TABBAR = 'text-primary dark:text-clubred-300'
 </script>
 
 <template>

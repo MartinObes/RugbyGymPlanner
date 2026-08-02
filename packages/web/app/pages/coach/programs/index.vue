@@ -91,7 +91,12 @@ async function remove() {
       <UCard v-for="program in data.programs" :key="program.id">
         <div class="flex items-start justify-between gap-2">
           <NuxtLink :to="`/coach/programs/${program.id}`" class="min-w-0 flex-1">
-            <h3 class="truncate font-medium hover:text-primary">{{ program.name }}</h3>
+            <!-- dark:hover:text-clubred-300: el rojo del club en oscuro (vía
+                 text-primary) da 2.40:1 sobre el fondo de página, abajo del AA.
+                 El 300 da 5.07:1. -->
+            <h3 class="truncate font-medium hover:text-primary dark:hover:text-clubred-300">
+              {{ program.name }}
+            </h3>
             <p class="mt-1 text-sm text-muted">
               {{ program.weekCount }} {{ program.weekCount === 1 ? 'semana' : 'semanas' }} ·
               {{ program.assignmentCount }}

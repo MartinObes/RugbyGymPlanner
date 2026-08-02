@@ -19,22 +19,39 @@ const { programId } = inject<ProgramContext>('program')!
 const api = useCoachApi()
 const toast = useToast()
 
-const { data: assignments, refresh: refreshAssignments } = await useAsyncData(
-  `assignments-${programId}`,
-  () => api.get<AssignmentsResponse>(`/api/coach/programs/${programId}/assignments`),
+/**
+ * Las cuatro cargas salen JUNTAS, no una atrás de otra.
+ *
+ * Antes cada una llevaba su propio `await`, y un `await` en el `setup` frena el
+ * siguiente: las cuatro requests se encadenaban. Y no son cuatro viajes, son
+ * doce — cada request autenticada paga antes el preámbulo de `withActor`
+ * (resolver la sesión + leer `profiles`), así que el costo fijo se multiplicaba
+ * por cuatro **en serie**. Medido: ~30 ms por viaje con la conexión caliente,
+ * 88–124 ms si hay que abrir TLS (docs/PERFORMANCE-F4.md).
+ *
+ * `useAsyncData` se sigue llamando de forma síncrona —Nuxt necesita eso para
+ * registrar la carga y serializar el payload del SSR—; lo único que se movió es
+ * el `await`, que ahora es uno solo para las cuatro.
+ */
+const assignmentsAsync = useAsyncData(`assignments-${programId}`, () =>
+  api.get<AssignmentsResponse>(`/api/coach/programs/${programId}/assignments`),
 )
-
-const { data: preview, refresh: refreshPreview } = await useAsyncData('assignment-preview', () =>
+const previewAsync = useAsyncData('assignment-preview', () =>
   api.get<AssignmentPreviewResponse>('/api/coach/assignments/preview'),
 )
-
-const { data: roster } = await useAsyncData('coach-players', () =>
+const rosterAsync = useAsyncData('coach-players', () =>
   api.get<CoachPlayersResponse>('/api/coach/players'),
 )
-
-const { data: groups } = await useAsyncData('coach-groups', () =>
+const groupsAsync = useAsyncData('coach-groups', () =>
   api.get<GroupsResponse>('/api/coach/groups'),
 )
+
+await Promise.all([assignmentsAsync, previewAsync, rosterAsync, groupsAsync])
+
+const { data: assignments, refresh: refreshAssignments } = assignmentsAsync
+const { data: preview, refresh: refreshPreview } = previewAsync
+const { data: roster } = rosterAsync
+const { data: groups } = groupsAsync
 
 // --- form de alta ------------------------------------------------------------
 
@@ -99,9 +116,23 @@ async function create() {
   }
 }
 
-async function remove(id: string) {
+const confirmingAssignment = ref<{ id: string; targetName: string } | null>(null)
+// UModal espera un boolean en v-model:open; el objeto guarda qué asignación se quita.
+const confirmAssignmentOpen = computed({
+  get: () => confirmingAssignment.value !== null,
+  set: (value: boolean) => {
+    if (!value) confirmingAssignment.value = null
+  },
+})
+const removingAssignment = ref(false)
+
+async function remove() {
+  if (!confirmingAssignment.value) return
+  removingAssignment.value = true
   try {
-    await api.del(`/api/coach/assignments/${id}`)
+    await api.del(`/api/coach/assignments/${confirmingAssignment.value.id}`)
+    toast.add({ title: 'Asignación quitada', color: 'success' })
+    confirmingAssignment.value = null
     await Promise.all([refreshAssignments(), refreshPreview()])
   } catch (e) {
     toast.add({
@@ -109,6 +140,8 @@ async function remove(id: string) {
       description: e instanceof Error ? e.message : undefined,
       color: 'error',
     })
+  } finally {
+    removingAssignment.value = false
   }
 }
 
@@ -134,8 +167,17 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
           <USelect v-model="mode" :items="MODE_ITEMS" class="w-44" />
         </UFormField>
 
+        <!-- USelectMenu y no USelect: la lista de destinos es el plantel entero
+             (hasta ~60 jugadores), y bajar una lista larga con el pulgar es peor
+             que escribir tres letras. USelect no tiene buscador. -->
         <UFormField label="Destino" class="min-w-48 flex-1">
-          <USelect v-model="target" :items="targetItems" placeholder="Elegí…" class="w-full" />
+          <USelectMenu
+            v-model="target"
+            :items="targetItems"
+            value-key="value"
+            placeholder="Elegí…"
+            class="w-full"
+          />
         </UFormField>
 
         <UFormField label="Prioridad extra" :hint="`base ${basePriorityForMode}`">
@@ -168,7 +210,9 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
           :key="assignment.id"
           class="flex items-center gap-3 py-2"
         >
-          <UBadge color="neutral" variant="subtle">{{ KIND_LABEL[assignment.kind] }}</UBadge>
+          <!-- navy: clasificador (a qué tipo de destino apunta la asignación),
+               no un estado. -->
+          <UBadge color="navy" variant="subtle">{{ KIND_LABEL[assignment.kind] }}</UBadge>
           <span class="min-w-0 flex-1 truncate font-medium">{{ assignment.targetName }}</span>
           <span class="font-mono text-sm text-muted">
             {{ assignment.basePriority }}
@@ -183,7 +227,11 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
             variant="ghost"
             size="xs"
             aria-label="Quitar"
-            @click="remove(assignment.id)"
+            @click="
+              () => {
+                confirmingAssignment = { id: assignment.id, targetName: assignment.targetName }
+              }
+            "
           />
         </li>
       </ul>
@@ -219,5 +267,25 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
         </li>
       </ul>
     </UCard>
+
+    <UModal
+      v-model:open="confirmAssignmentOpen"
+      :title="`¿Quitar la asignación a ${confirmingAssignment?.targetName}?`"
+    >
+      <template #body>
+        <p class="text-sm text-muted">
+          Este programa deja de alcanzar a ese destino. Si tenía otro programa con menor prioridad
+          asignado, pasa a recibir ese en su lugar.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmingAssignment = null }">
+            Cancelar
+          </UButton>
+          <UButton color="error" :loading="removingAssignment" @click="remove">Quitar</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

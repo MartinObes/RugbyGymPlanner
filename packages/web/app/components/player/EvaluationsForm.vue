@@ -71,6 +71,7 @@ async function remove(id: string) {
   try {
     const res = await api.del<{ evaluations: Evaluation[] }>(`${props.basePath}/evaluations/${id}`)
     emit('changed', res.evaluations)
+    toast.add({ title: 'Test borrado' })
   } catch (error) {
     toast.add({
       title: 'No se pudo borrar',

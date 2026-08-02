@@ -24,6 +24,7 @@ const props = defineProps<{ value: ExerciseRowValue; exercises: ExerciseOption[]
 const emit = defineEmits<{ remove: [] }>()
 
 const api = useCoachApi()
+const toast = useToast()
 
 const row = reactive({ ...props.value })
 
@@ -39,6 +40,20 @@ const { trigger, state, error } = useDebouncedSave(async () => {
     targetRpe: row.targetRpe,
   })
 })
+
+// El ícono de error solo se ve al pasar el mouse (tooltip), inútil en la tablet
+// del coach. El toast es la señal que sí se nota sin hover.
+watch(state, (value) => {
+  if (value === 'error') {
+    toast.add({
+      title: 'No se pudo guardar el ejercicio',
+      description: error.value ?? undefined,
+      color: 'error',
+    })
+  }
+})
+
+const confirmRemoveOpen = ref(false)
 
 const LOAD_ITEMS = [
   { label: 'Kg', value: 'WEIGHT' },
@@ -169,8 +184,32 @@ function onLoadTypeChange(next: unknown) {
         variant="ghost"
         size="xs"
         aria-label="Borrar ejercicio"
-        @click="emit('remove')"
+        @click="() => { confirmRemoveOpen = true }"
       />
     </div>
+
+    <UModal v-model:open="confirmRemoveOpen" title="¿Borrar este ejercicio?">
+      <template #body>
+        <p class="text-sm text-muted">Se borra de este bloque. No se puede deshacer.</p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmRemoveOpen = false }">
+            Cancelar
+          </UButton>
+          <UButton
+            color="error"
+            @click="
+              () => {
+                confirmRemoveOpen = false
+                emit('remove')
+              }
+            "
+          >
+            Borrar ejercicio
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

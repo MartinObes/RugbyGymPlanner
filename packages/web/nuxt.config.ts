@@ -11,6 +11,20 @@ export default defineNuxtConfig({
   // Tailwind y la app se sirve sin estilos.
   css: ['~/assets/css/main.css'],
 
+  app: {
+    /**
+     * Transición entre páginas. `out-in` y no cruzada: dos pantallas superpuestas
+     * a mitad de camino se leen como un glitch, sobre todo en el celular donde
+     * ocupan el ancho entero.
+     *
+     * 150 ms es corto a propósito. La transición SUMA latencia a una navegación
+     * que ya es lenta (docs/PERFORMANCE-F4.md), así que tiene que alcanzar para
+     * dar continuidad y no para hacerse notar. Las clases y el respeto por
+     * `prefers-reduced-motion` están en app/assets/css/main.css.
+     */
+    pageTransition: { name: 'page', mode: 'out-in' },
+  },
+
   ui: {
     // Registrar un alias propio es lo que genera --ui-navy y las clases
     // text-navy-500 / bg-navy-500. Los seis de la lista default de Nuxt UI hay
@@ -56,6 +70,7 @@ export default defineNuxtConfig({
         'lucide:moon',
         'lucide:pencil',
         'lucide:plus',
+        'lucide:search',
         'lucide:shield',
         'lucide:sun',
         'lucide:trash-2',

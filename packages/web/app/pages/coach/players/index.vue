@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CoachPlayersResponse } from '~~/generated'
 import { positionById } from '@coachlab/core/domain/positions'
+import { normName } from '@coachlab/core/domain/normName'
 
 const { user } = useAuth()
 const api = useCoachApi()
@@ -17,6 +18,16 @@ async function copyCode() {
   copied.value = true
   setTimeout(() => (copied.value = false), 2000)
 }
+
+// Techo de diseño de 300 jugadores (CLAUDE.md §1): sin buscador, encontrar uno
+// es scrollear a ciegas. normName tolera acentos, igual que el matching de 1RM.
+const search = ref('')
+const filteredPlayers = computed(() => {
+  const players = data.value?.players ?? []
+  const query = normName(search.value)
+  if (!query) return players
+  return players.filter((player) => normName(player.name).includes(query))
+})
 
 const releasing = ref<string | null>(null)
 const confirming = ref<{ id: string; name: string } | null>(null)
@@ -89,31 +100,41 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
       </p>
     </UCard>
 
-    <UCard v-else-if="data">
-      <ul class="divide-y divide-default">
-        <li v-for="player in data.players" :key="player.id" class="flex items-center gap-3 py-3">
-          <NuxtLink :to="`/coach/players/${player.id}`" class="flex min-w-0 flex-1 items-center gap-3">
-            <UIcon name="i-lucide-user" class="size-5 shrink-0 text-muted" />
-            <div class="min-w-0">
-              <p class="truncate font-medium">{{ player.name }}</p>
-              <p class="truncate text-sm text-muted">{{ player.email }}</p>
-            </div>
-          </NuxtLink>
+    <div v-else-if="data" class="space-y-3">
+      <UInput
+        v-model="search"
+        icon="i-lucide-search"
+        placeholder="Buscá por nombre…"
+        class="w-full sm:max-w-xs"
+      />
 
-          <span class="hidden text-sm text-muted sm:block">{{ positionName(player.positionId) }}</span>
+      <UCard>
+        <ul v-if="filteredPlayers.length > 0" class="divide-y divide-default">
+          <li v-for="player in filteredPlayers" :key="player.id" class="flex items-center gap-3 py-3">
+            <NuxtLink :to="`/coach/players/${player.id}`" class="flex min-w-0 flex-1 items-center gap-3">
+              <UIcon name="i-lucide-user" class="size-5 shrink-0 text-muted" />
+              <div class="min-w-0">
+                <p class="truncate font-medium">{{ player.name }}</p>
+                <p class="truncate text-sm text-muted">{{ player.email }}</p>
+              </div>
+            </NuxtLink>
 
-          <UButton
-            icon="i-lucide-user-minus"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            :loading="releasing === player.id"
-            aria-label="Sacar del plantel"
-            @click="() => { confirming = { id: player.id, name: player.name } }"
-          />
-        </li>
-      </ul>
-    </UCard>
+            <span class="hidden text-sm text-muted sm:block">{{ positionName(player.positionId) }}</span>
+
+            <UButton
+              icon="i-lucide-user-minus"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :loading="releasing === player.id"
+              aria-label="Sacar del plantel"
+              @click="() => { confirming = { id: player.id, name: player.name } }"
+            />
+          </li>
+        </ul>
+        <p v-else class="text-muted">Ningún jugador coincide con "{{ search }}".</p>
+      </UCard>
+    </div>
 
     <UModal v-model:open="confirmOpen" :title="`¿Sacar a ${confirming?.name} del plantel?`">
       <template #body>

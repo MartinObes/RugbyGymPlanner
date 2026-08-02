@@ -62,9 +62,23 @@ async function save() {
   }
 }
 
-async function remove(id: string) {
+const confirmingGroup = ref<{ id: string; name: string } | null>(null)
+// UModal espera un boolean en v-model:open; el objeto guarda qué grupo se borra.
+const confirmGroupOpen = computed({
+  get: () => confirmingGroup.value !== null,
+  set: (value: boolean) => {
+    if (!value) confirmingGroup.value = null
+  },
+})
+const removingGroup = ref(false)
+
+async function remove() {
+  if (!confirmingGroup.value) return
+  removingGroup.value = true
   try {
-    await api.del(`/api/coach/groups/${id}`)
+    await api.del(`/api/coach/groups/${confirmingGroup.value.id}`)
+    toast.add({ title: 'Grupo borrado', color: 'success' })
+    confirmingGroup.value = null
     await refresh()
   } catch (e) {
     toast.add({
@@ -72,6 +86,8 @@ async function remove(id: string) {
       description: e instanceof Error ? e.message : undefined,
       color: 'error',
     })
+  } finally {
+    removingGroup.value = false
   }
 }
 
@@ -149,7 +165,7 @@ const positionName = (id: string) => positionById(id)?.name ?? id
               variant="ghost"
               size="xs"
               aria-label="Borrar"
-              @click="remove(group.id)"
+              @click="() => { confirmingGroup = { id: group.id, name: group.name } }"
             />
           </div>
         </div>
@@ -180,7 +196,8 @@ const positionName = (id: string) => positionById(id)?.name ?? id
         <UCard v-for="group in systemGroups" :key="group.id">
           <div class="flex items-start justify-between gap-2">
             <h3 class="font-medium">{{ group.name }}</h3>
-            <UBadge color="neutral" variant="subtle">Del sistema</UBadge>
+            <!-- navy: clasificador (de dónde viene el grupo), no un estado. -->
+            <UBadge color="navy" variant="subtle">Del sistema</UBadge>
           </div>
           <div class="mt-3 flex flex-wrap gap-1">
             <UBadge
@@ -195,5 +212,22 @@ const positionName = (id: string) => positionById(id)?.name ?? id
         </UCard>
       </div>
     </div>
+
+    <UModal v-model:open="confirmGroupOpen" :title="`¿Borrar ${confirmingGroup?.name}?`">
+      <template #body>
+        <p class="text-sm text-muted">
+          Se borra el grupo. Los programas asignados a él dejan de alcanzar a los jugadores que
+          agrupaba. No se puede deshacer.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmingGroup = null }">
+            Cancelar
+          </UButton>
+          <UButton color="error" :loading="removingGroup" @click="remove">Borrar grupo</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

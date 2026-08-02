@@ -9,7 +9,9 @@
  */
 const props = defineProps<{ completed: number; total: number; ratio: number }>()
 
-const degrees = computed(() => Math.round(props.ratio * 360))
+// Con `total = 0` (semana sin días todavía) `ratio` llega NaN y ensuciaría el
+// ángulo del conic-gradient: sin días no hay progreso que dibujar.
+const degrees = computed(() => (props.total > 0 ? Math.round(props.ratio * 360) : 0))
 </script>
 
 <template>

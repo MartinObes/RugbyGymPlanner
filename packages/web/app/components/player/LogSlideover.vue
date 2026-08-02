@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parsePlannedReps } from '@coachlab/core/domain/plannedReps'
 import type { PlayerExercise } from '~~/generated'
 
 /**
@@ -20,12 +21,35 @@ const weight = ref<number | null>(props.exercise.entry?.weight ?? null)
 const reps = ref<number | null>(props.exercise.entry?.reps ?? null)
 const rpe = ref<number | null>(props.exercise.entry?.rpe ?? null)
 
-/** El peso prescrito, para arrancar el stepper donde el jugador espera. */
+// El padre refresca `week` (p.ej. al reabrir un día, o al volver a esta pantalla)
+// y ahí es cuando se sabe qué quedó de verdad guardado en el server. Sin este
+// watch, si un PUT falló con wifi mala, la fila seguía mostrando el registro
+// optimista para siempre. Mismo patrón que el `watch` de StepperField.vue sobre
+// su propio `draft`.
+watch(
+  () => props.exercise.entry,
+  (entry) => {
+    weight.value = entry?.weight ?? null
+    reps.value = entry?.reps ?? null
+    rpe.value = entry?.rpe ?? null
+  },
+)
+
+/**
+ * Los tres valores del PLAN. Se muestran en gris dentro de cada campo y arrancan
+ * los −/+, pero no se guardan solos: ver el comentario de StepperField.vue.
+ *
+ * Sin peso prescrito (carga por etiqueta, o sin 1RM cargado) el placeholder
+ * queda en "—" en vez de en 0 — sugerir cero kilos no ayuda a nadie.
+ */
 const prescribed = computed(() =>
   props.exercise.load.kind === 'weight' || props.exercise.load.kind === 'percentage'
     ? (props.exercise.load.kg ?? null)
     : null,
 )
+
+/** `reps` del plan es texto ("8-10", "máx"): el número sale del dominio. */
+const plannedReps = computed(() => parsePlannedReps(props.exercise.reps))
 
 const { trigger, flush, state, error } = useDebouncedSave(async () => {
   await api.put(`/api/player/days/${props.dayId}/entries/${props.exercise.id}`, {
@@ -64,12 +88,14 @@ const summary = computed(() => {
   </UButton>
   <UButton
     v-else
-    color="navy"
+    :color="state === 'error' ? 'error' : 'navy'"
     variant="soft"
     size="xs"
+    :icon="state === 'error' ? 'i-lucide-triangle-alert' : undefined"
     trailing-icon="i-lucide-pencil"
     :disabled="disabled"
     class="shrink-0"
+    :title="state === 'error' ? 'No se guardó, tocá para reintentar' : undefined"
     @click="() => { open = true }"
   >
     {{ summary }}
@@ -85,26 +111,29 @@ const summary = computed(() => {
       <div class="space-y-2.5">
         <PlayerStepperField
           v-model="weight"
-          label="Peso (kg)"
+          label="Peso"
+          unit="kg"
           :step="0.5"
           :max="500"
-          :fallback="prescribed ?? 0"
+          :fallback="prescribed"
           @update:model-value="trigger(undefined)"
         />
         <PlayerStepperField
           v-model="reps"
           label="Reps"
           :max="999"
-          :fallback="1"
+          :fallback="plannedReps"
           @update:model-value="trigger(undefined)"
         />
+        <!-- El gris de acá es el RPE OBJETIVO del coach, no un 7 inventado: es
+             exactamente el número contra el que se va a comparar después. -->
         <PlayerStepperField
           v-model="rpe"
           label="RPE percibido"
           :step="0.5"
           :min="1"
           :max="10"
-          :fallback="7"
+          :fallback="exercise.targetRpe"
           @update:model-value="trigger(undefined)"
         />
 

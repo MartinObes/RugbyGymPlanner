@@ -59,18 +59,27 @@ async function addExercise() {
 async function removeExercise(id: string) {
   try {
     await api.del(`/api/coach/block-exercises/${id}`)
+    toast.add({ title: 'Ejercicio borrado', color: 'success' })
     emit('changed')
   } catch (e) {
     toast.add({ title: 'No se pudo borrar', description: msg(e), color: 'error' })
   }
 }
 
+const confirmRemoveBlockOpen = ref(false)
+const removingBlock = ref(false)
+
 async function removeBlock() {
+  removingBlock.value = true
   try {
     await api.del(`/api/coach/blocks/${props.block.id}`)
+    toast.add({ title: 'Bloque borrado', color: 'success' })
+    confirmRemoveBlockOpen.value = false
     emit('changed')
   } catch (e) {
     toast.add({ title: 'No se pudo borrar el bloque', description: msg(e), color: 'error' })
+  } finally {
+    removingBlock.value = false
   }
 }
 
@@ -103,7 +112,7 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : undefined)
         variant="ghost"
         size="xs"
         aria-label="Borrar bloque"
-        @click="removeBlock"
+        @click="() => { confirmRemoveBlockOpen = true }"
       />
     </div>
 
@@ -128,5 +137,21 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : undefined)
     >
       Ejercicio
     </UButton>
+
+    <UModal v-model:open="confirmRemoveBlockOpen" title="¿Borrar este bloque?">
+      <template #body>
+        <p class="text-sm text-muted">
+          Se borra el bloque con todos sus ejercicios. No se puede deshacer.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmRemoveBlockOpen = false }">
+            Cancelar
+          </UButton>
+          <UButton color="error" :loading="removingBlock" @click="removeBlock">Borrar bloque</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

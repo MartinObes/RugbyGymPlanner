@@ -76,12 +76,28 @@ async function renameWeek(weekId: string, name: string) {
   }
 }
 
-async function removeWeek(weekId: string) {
+const confirmingWeek = ref<{ id: string; name: string } | null>(null)
+// UModal espera un boolean en v-model:open; el objeto guarda qué semana se borra.
+const confirmWeekOpen = computed({
+  get: () => confirmingWeek.value !== null,
+  set: (value: boolean) => {
+    if (!value) confirmingWeek.value = null
+  },
+})
+const removingWeek = ref(false)
+
+async function removeWeek() {
+  if (!confirmingWeek.value) return
+  removingWeek.value = true
   try {
-    await api.del(`/api/coach/weeks/${weekId}`)
+    await api.del(`/api/coach/weeks/${confirmingWeek.value.id}`)
+    toast.add({ title: 'Semana borrada', color: 'success' })
+    confirmingWeek.value = null
     await refresh()
   } catch (e) {
     toast.add({ title: 'No se pudo borrar la semana', description: msg(e), color: 'error' })
+  } finally {
+    removingWeek.value = false
   }
 }
 
@@ -113,7 +129,11 @@ const weekNameDraft = ref('')
         :key="week.id"
         :class="[
           'flex items-center gap-1 rounded-md border px-2 py-1',
-          week.id === activeWeekId ? 'border-primary bg-elevated' : 'border-default',
+          // dark:border-clubred-300: en oscuro clubred-400 (vía border-primary)
+          // da 2.40:1 sobre el fondo de página, abajo del AA. El 300 da 5.07:1.
+          week.id === activeWeekId
+            ? 'border-primary bg-elevated dark:border-clubred-300'
+            : 'border-default',
         ]"
       >
         <UInput
@@ -150,6 +170,21 @@ const weekNameDraft = ref('')
           {{ week.name }}
         </button>
 
+        <UButton
+          v-if="renamingWeek !== week.id"
+          icon="i-lucide-pencil"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          aria-label="Renombrar semana"
+          @click="
+            () => {
+              renamingWeek = week.id
+              weekNameDraft = week.name
+            }
+          "
+        />
+
         <UBadge v-if="week.id === program?.currentWeekId" color="success" variant="subtle" size="sm">
           Actual
         </UBadge>
@@ -171,7 +206,7 @@ const weekNameDraft = ref('')
           variant="ghost"
           size="xs"
           aria-label="Borrar semana"
-          @click="removeWeek(week.id)"
+          @click="() => { confirmingWeek = { id: week.id, name: week.name } }"
         />
       </div>
 
@@ -181,8 +216,8 @@ const weekNameDraft = ref('')
     </div>
 
     <p class="text-xs text-muted">
-      Doble click en el nombre de una semana para renombrarla. La marcada como actual es la que ven
-      los jugadores.
+      Tocá el lápiz (o hacé doble click en el nombre) para renombrar una semana. La marcada como
+      actual es la que ven los jugadores.
     </p>
 
     <!-- Días de la semana activa -->
@@ -205,5 +240,21 @@ const weekNameDraft = ref('')
     <UCard v-else>
       <p class="text-muted">Este programa no tiene semanas. Agregá una para empezar.</p>
     </UCard>
+
+    <UModal v-model:open="confirmWeekOpen" :title="`¿Borrar ${confirmingWeek?.name}?`">
+      <template #body>
+        <p class="text-sm text-muted">
+          Se borra la semana con todos sus días, bloques y ejercicios. No se puede deshacer.
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton color="neutral" variant="ghost" @click="() => { confirmingWeek = null }">
+            Cancelar
+          </UButton>
+          <UButton color="error" :loading="removingWeek" @click="removeWeek">Borrar semana</UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
