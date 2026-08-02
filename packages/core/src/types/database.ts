@@ -342,6 +342,7 @@ export type Database = {
           name: string
           position_id: string | null
           role: string
+          selected_program_id: string | null
           updated_at: string
           weight_kg: number | null
         }
@@ -355,6 +356,7 @@ export type Database = {
           name: string
           position_id?: string | null
           role: string
+          selected_program_id?: string | null
           updated_at?: string
           weight_kg?: number | null
         }
@@ -368,6 +370,7 @@ export type Database = {
           name?: string
           position_id?: string | null
           role?: string
+          selected_program_id?: string | null
           updated_at?: string
           weight_kg?: number | null
         }
@@ -379,6 +382,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_selected_program_id_fkey"
+            columns: ["selected_program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
         ]
       }
       program_assignments: {
@@ -387,8 +397,6 @@ export type Database = {
           id: string
           player_id: string | null
           position_group_id: string | null
-          position_id: string | null
-          priority: number
           program_id: string
           system_group_id: string | null
         }
@@ -397,8 +405,6 @@ export type Database = {
           id?: string
           player_id?: string | null
           position_group_id?: string | null
-          position_id?: string | null
-          priority?: number
           program_id: string
           system_group_id?: string | null
         }
@@ -407,8 +413,6 @@ export type Database = {
           id?: string
           player_id?: string | null
           position_group_id?: string | null
-          position_id?: string | null
-          priority?: number
           program_id?: string
           system_group_id?: string | null
         }
@@ -581,6 +585,7 @@ export type Database = {
       program_reaches_me: { Args: { target: string }; Returns: boolean }
       redeem_invite_code: { Args: { code: string }; Returns: undefined }
       release_player: { Args: { player_id: string }; Returns: undefined }
+      system_group_of: { Args: { target: unknown }; Returns: unknown }
     }
     Enums: {
       [_ in never]: never

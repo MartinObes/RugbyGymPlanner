@@ -38,7 +38,7 @@ export type PlayerWeek = {
  */
 export async function playerWeekFor(
   db: SupabaseClient<Database>,
-  player: { id: string; positionId: string | null },
+  player: { id: string; positionId: string | null; selectedProgramId?: string | null },
 ): Promise<PlayerWeek | null> {
   const programId = await activeProgramIdFor(db, player)
   if (!programId) return null

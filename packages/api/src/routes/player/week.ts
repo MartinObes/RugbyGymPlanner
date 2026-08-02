@@ -115,7 +115,7 @@ playerWeek.openapi(
     const actor = c.get('actor')!
     const db = c.get('db')
 
-    const week = await playerWeekFor(db, { id: actor.id, positionId: actor.positionId })
+    const week = await playerWeekFor(db, actor)
     if (!week) return c.json({ ok: true as const, week: null }, 200)
 
     const closings = await dayClosingsFor(
@@ -170,7 +170,7 @@ playerWeek.openapi(
     const input = c.req.valid('json')
     const db = c.get('db')
 
-    await assertOwnedDay(db, { id: actor.id, positionId: actor.positionId }, dayId, blockExerciseId)
+    await assertOwnedDay(db, actor, dayId, blockExerciseId)
 
     const log = await ensureSessionLog(db, actor.id, dayId)
     if (log.completed_at !== null) {
@@ -230,7 +230,7 @@ playerWeek.openapi(
     const { note, perceivedRpe } = c.req.valid('json')
     const db = c.get('db')
 
-    await assertOwnedDay(db, { id: actor.id, positionId: actor.positionId }, dayId)
+    await assertOwnedDay(db, actor, dayId)
     const log = await ensureSessionLog(db, actor.id, dayId)
 
     const { data, error } = await db
@@ -265,7 +265,7 @@ playerWeek.openapi(
     const { dayId } = c.req.valid('param')
     const db = c.get('db')
 
-    await assertOwnedDay(db, { id: actor.id, positionId: actor.positionId }, dayId)
+    await assertOwnedDay(db, actor, dayId)
 
     const { data, error } = await db
       .from('session_logs')

@@ -5,6 +5,7 @@ import { admin } from './routes/admin'
 import { auth } from './routes/auth'
 import { catalog } from './routes/catalog'
 import { assignments } from './routes/coach/assignments'
+import { feedback } from './routes/coach/feedback'
 import { groups } from './routes/coach/groups'
 import { programImport } from './routes/coach/import'
 import { players } from './routes/coach/players'
@@ -13,6 +14,7 @@ import { tree } from './routes/coach/tree'
 import { health } from './routes/health'
 import { playerDashboard } from './routes/player/dashboard'
 import { playerEvaluations } from './routes/player/evaluations'
+import { playerPrograms } from './routes/player/programs'
 import { playerProfile } from './routes/player/profile'
 import { playerWeek } from './routes/player/week'
 
@@ -49,8 +51,10 @@ app.route('/', groups)
 app.route('/', programs)
 app.route('/', tree)
 app.route('/', assignments)
+app.route('/', feedback)
 app.route('/', programImport)
 app.route('/', playerWeek)
+app.route('/', playerPrograms)
 app.route('/', playerProfile)
 app.route('/', playerEvaluations)
 app.route('/', playerDashboard)

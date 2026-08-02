@@ -1,55 +1,64 @@
 /**
- * Los cuatro destinos posibles de un assignment, con los nombres de las columnas
- * de program_assignments: player_id, position_group_id (custom),
- * system_group_id (forwards/backs) y position_id.
+ * Los tres destinos posibles de un assignment, con los nombres de las columnas
+ * de program_assignments: player_id, position_group_id (custom) y
+ * system_group_id (forwards/backs).
+ *
+ * `POSITION` se eliminó en F4-B: un puesto suelto se modela como grupo custom de
+ * una sola posición, que hace lo mismo y ya existía. Ver
+ * docs/superpowers/specs/2026-07-31-f4b-assignment-model-design.md §2.2.
+ *
+ * Esto NO toca profiles.position_id: el puesto del jugador sigue siendo lo que
+ * decide a qué grupo system pertenece y qué grupos custom lo contienen. Lo único
+ * que se fue es apuntar un assignment directamente a un puesto.
  */
-export type AssignmentKind = 'PLAYER' | 'POSITION_GROUP' | 'SYSTEM_GROUP' | 'POSITION'
-
-/** CLAUDE.md §3: individual pisa grupo custom, pisa grupo system, pisa puesto. */
-export const BASE_PRIORITY: Record<AssignmentKind, number> = {
-  PLAYER: 100,
-  POSITION_GROUP: 50,
-  SYSTEM_GROUP: 30,
-  POSITION: 10,
-}
+export type AssignmentKind = 'PLAYER' | 'POSITION_GROUP' | 'SYSTEM_GROUP'
 
 export type CandidateAssignment = {
   assignmentId: string
   programId: string
   kind: AssignmentKind
-  /** Override que define el coach por assignment. Se SUMA a la base. */
-  priority: number
   createdAt: Date
 }
 
-export function scoreOf(candidate: CandidateAssignment): number {
-  return BASE_PRIORITY[candidate.kind] + candidate.priority
-}
-
 /**
- * Elige el assignment vigente entre los que le aplican a un jugador.
- * Gana el score más alto; ante empate, el createdAt más reciente.
+ * Elige el programa vigente de un jugador.
+ *
+ * La regla es de una línea (F4-B §2.1): **gana la última asignada**. Reemplaza a
+ * la resolución por prioridad de cuatro niveles, que obligaba al coach a razonar
+ * si 50 + override le ganaba a 100 cuando lo único que quería era que valiera lo
+ * último que dijo. El caso real que la motivó: "este jugador se lesionó, lo paso
+ * a la rutina de lesionados".
+ *
+ * `selectedProgramId` es la elección del jugador (F4-B §2.3). Sólo vale si ese
+ * programa TODAVÍA está entre las candidatas: el coach puede haberle quitado el
+ * assignment, o haberlo cambiado de puesto, o haberlo sacado de un grupo custom,
+ * y de ninguno de esos tres se entera la FK. Ante una elección inválida se
+ * degrada al default en vez de romper el render — el mismo criterio que
+ * isPositionId e isLoadType.
  *
  * Pura a propósito (CLAUDE.md §3): se podría resolver en SQL con un
- * ORDER BY ... LIMIT 1, pero entonces la regla de negocio viviría en un string
- * y solo se podría testear con una base levantada.
+ * ORDER BY ... LIMIT 1, pero entonces la regla de negocio viviría en un string y
+ * solo se podría testear con una base levantada.
  */
 export function resolveProgram(
   candidates: readonly CandidateAssignment[],
+  selectedProgramId?: string | null,
 ): CandidateAssignment | null {
-  let winner: CandidateAssignment | null = null
-  let winnerScore = -Infinity
+  if (selectedProgramId) {
+    const chosen = latest(candidates.filter((c) => c.programId === selectedProgramId))
+    if (chosen) return chosen
+  }
 
-  for (const candidate of candidates) {
-    const score = scoreOf(candidate)
-    if (score > winnerScore) {
-      winner = candidate
-      winnerScore = score
-      continue
-    }
-    if (score === winnerScore && winner && candidate.createdAt > winner.createdAt) {
-      winner = candidate
-    }
+  return latest(candidates)
+}
+
+function latest(pool: readonly CandidateAssignment[]): CandidateAssignment | null {
+  let winner: CandidateAssignment | null = null
+
+  for (const candidate of pool) {
+    // `>` y no `>=`: ante un empate exacto de createdAt gana la primera, así el
+    // resultado no depende del orden en que PostgREST devolvió las filas.
+    if (!winner || candidate.createdAt > winner.createdAt) winner = candidate
   }
 
   return winner

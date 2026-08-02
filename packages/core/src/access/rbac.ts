@@ -10,7 +10,16 @@ import type { Role, SessionUser } from '../validators/auth'
  * usa — por eso se suma acá y no en `SessionUser`, que es el contrato de la
  * sesión de Nuxt.
  */
-export type Actor = SessionUser & { positionId: string | null }
+export type Actor = SessionUser & {
+  positionId: string | null
+  /**
+   * La rutina que el jugador eligió mirar. `null` = la última asignada, NO
+   * "ninguna" (F4-B §2.3). Viaja en el actor y no se consulta por ruta porque
+   * las tres vistas del jugador —semana, día y dashboard— resuelven el mismo
+   * programa y ya cargan el perfil una sola vez en withActor.
+   */
+  selectedProgramId: string | null
+}
 
 /**
  * Recurso ajeno responde 404, nunca 403: un 403 confirma que el recurso existe

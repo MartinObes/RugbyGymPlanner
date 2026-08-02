@@ -19,10 +19,14 @@ export type SessionLog = { id: string; completed_at: string | null }
  */
 export async function assertOwnedDay(
   db: SupabaseClient<Database>,
-  player: { id: string; positionId: string | null },
+  player: { id: string; positionId: string | null; selectedProgramId?: string | null },
   dayId: string,
   blockExerciseId?: string,
 ): Promise<void> {
+  // El programa vigente incluye la elección del jugador (F4-B §2.3): si eligió
+  // volver a una rutina anterior, los días que puede registrar son los de ESA.
+  // Resolver acá con el default lo dejaría mirando una rutina y sin poder
+  // registrarla.
   const programId = await activeProgramIdFor(db, player)
   if (!programId) throw new NotFoundError()
 

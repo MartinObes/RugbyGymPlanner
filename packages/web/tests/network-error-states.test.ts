@@ -23,7 +23,22 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '
 
 const read = (relPath: string) => readFileSync(join(ROOT, relPath), 'utf8')
 
-const DESTRUCTURE_ERROR = /const\s*\{\s*data,\s*error,\s*refresh\s*\}\s*=\s*await useAsyncData/
+/**
+ * `error` desestructurado de la carga, en las DOS formas que usa el repo:
+ *
+ *   - directa:   `const { data, error, refresh } = await useAsyncData(...)`
+ *   - diferida:  `const { data, error, refresh } = weekAsync`, cuando la
+ *                pantalla arranca varias cargas y las espera juntas con un solo
+ *                Promise.all. Es el patrón de docs/PERFORMANCE-F4.md: un `await`
+ *                en el setup frena el siguiente, así que encadenarlas multiplica
+ *                el preámbulo de withActor por la cantidad de requests.
+ *
+ * Lo que sigue siendo obligatorio es `error`: sin él la pantalla no puede
+ * distinguir "no tenés nada" de "se cayó la red", que es el bug que este archivo
+ * existe para prevenir.
+ */
+const DESTRUCTURE_ERROR =
+  /const\s*\{[^}]*\berror\b[^}]*\}\s*=\s*(await\s+useAsyncData|[A-Za-z_$][\w$]*Async\b)/
 
 describe('dashboard del jugador (player/index.vue) — sin tests vs. error de red', () => {
   const source = read('app/pages/player/index.vue')

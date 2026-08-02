@@ -50,6 +50,7 @@ export default defineNuxtConfig({
     clientBundle: {
       scan: true,
       icons: [
+        'lucide:activity',
         'lucide:calendar-days',
         'lucide:calendar-x',
         'lucide:check',

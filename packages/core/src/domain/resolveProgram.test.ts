@@ -1,128 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { BASE_PRIORITY, type CandidateAssignment, resolveProgram, scoreOf } from './resolveProgram'
+import { resolveProgram, type CandidateAssignment } from './resolveProgram'
 
-const at = (iso: string) => new Date(iso)
-
-function candidate(over: Partial<CandidateAssignment> = {}): CandidateAssignment {
-  return {
-    assignmentId: 'a1',
-    programId: 'p1',
-    kind: 'POSITION',
-    priority: 0,
-    createdAt: at('2026-01-01T00:00:00Z'),
-    ...over,
-  }
-}
-
-describe('BASE_PRIORITY', () => {
-  it('respeta el orden individual > grupo custom > grupo system > puesto', () => {
-    expect(BASE_PRIORITY.PLAYER).toBe(100)
-    expect(BASE_PRIORITY.POSITION_GROUP).toBe(50)
-    expect(BASE_PRIORITY.SYSTEM_GROUP).toBe(30)
-    expect(BASE_PRIORITY.POSITION).toBe(10)
-  })
-})
-
-describe('scoreOf', () => {
-  it('suma el override de prioridad a la base', () => {
-    expect(scoreOf(candidate({ kind: 'POSITION', priority: 5 }))).toBe(15)
-  })
-
-  it('acepta override negativo', () => {
-    expect(scoreOf(candidate({ kind: 'PLAYER', priority: -80 }))).toBe(20)
-  })
+const at = (iso: string, over: Partial<CandidateAssignment> = {}): CandidateAssignment => ({
+  assignmentId: `a-${iso}`,
+  programId: `p-${iso}`,
+  kind: 'PLAYER',
+  createdAt: new Date(iso),
+  ...over,
 })
 
 describe('resolveProgram', () => {
-  it('sin candidatos devuelve null', () => {
+  it('sin candidatas no hay programa', () => {
     expect(resolveProgram([])).toBeNull()
   })
 
-  it('con un solo candidato lo devuelve', () => {
-    expect(resolveProgram([candidate({ programId: 'solo' })])?.programId).toBe('solo')
+  it('con una sola candidata gana esa', () => {
+    const only = at('2026-01-01')
+    expect(resolveProgram([only])).toBe(only)
   })
 
-  it('individual le gana a grupo custom', () => {
-    expect(
-      resolveProgram([
-        candidate({ assignmentId: 'g', kind: 'POSITION_GROUP', programId: 'grupo' }),
-        candidate({ assignmentId: 'i', kind: 'PLAYER', programId: 'individual' }),
-      ])?.programId,
-    ).toBe('individual')
+  it('gana la asignada mas recientemente, sin importar el destino', () => {
+    // La vieja regla habria hecho ganar a PLAYER (base 100) sobre SYSTEM_GROUP (30).
+    const older = at('2026-01-01', { kind: 'PLAYER' })
+    const newer = at('2026-02-01', { kind: 'SYSTEM_GROUP' })
+    expect(resolveProgram([older, newer])?.assignmentId).toBe(newer.assignmentId)
   })
 
-  it('grupo custom le gana a grupo system', () => {
-    expect(
-      resolveProgram([
-        candidate({ assignmentId: 's', kind: 'SYSTEM_GROUP', programId: 'forwards' }),
-        candidate({ assignmentId: 'c', kind: 'POSITION_GROUP', programId: 'primeras' }),
-      ])?.programId,
-    ).toBe('primeras')
+  it('el orden en que llegan las candidatas no cambia el resultado', () => {
+    const older = at('2026-01-01')
+    const newer = at('2026-02-01')
+    expect(resolveProgram([newer, older])?.assignmentId).toBe(newer.assignmentId)
+    expect(resolveProgram([older, newer])?.assignmentId).toBe(newer.assignmentId)
   })
 
-  it('grupo system le gana a puesto', () => {
-    expect(
-      resolveProgram([
-        candidate({ assignmentId: 'p', kind: 'POSITION', programId: 'puesto' }),
-        candidate({ assignmentId: 's', kind: 'SYSTEM_GROUP', programId: 'system' }),
-      ])?.programId,
-    ).toBe('system')
+  it('ante un empate exacto de createdAt es estable: gana la primera', () => {
+    const a = at('2026-01-01', { assignmentId: 'a1' })
+    const b = at('2026-01-01', { assignmentId: 'b1' })
+    expect(resolveProgram([a, b])?.assignmentId).toBe('a1')
   })
 
-  it('respeta los 4 niveles a la vez', () => {
-    expect(
-      resolveProgram([
-        candidate({ assignmentId: '1', kind: 'POSITION', programId: 'puesto' }),
-        candidate({ assignmentId: '2', kind: 'SYSTEM_GROUP', programId: 'system' }),
-        candidate({ assignmentId: '3', kind: 'POSITION_GROUP', programId: 'custom' }),
-        candidate({ assignmentId: '4', kind: 'PLAYER', programId: 'individual' }),
-      ])?.programId,
-    ).toBe('individual')
+  it('honra la eleccion del jugador cuando ese programa sigue entre las candidatas', () => {
+    const older = at('2026-01-01', { programId: 'vieja' })
+    const newer = at('2026-02-01', { programId: 'nueva' })
+    expect(resolveProgram([older, newer], 'vieja')?.programId).toBe('vieja')
   })
 
-  it('el override de prioridad puede dar vuelta el orden natural', () => {
-    expect(
-      resolveProgram([
-        candidate({ assignmentId: 'i', kind: 'PLAYER', programId: 'individual', priority: 0 }),
-        candidate({ assignmentId: 'p', kind: 'POSITION', programId: 'puesto', priority: 200 }),
-      ])?.programId,
-    ).toBe('puesto')
+  it('ignora una eleccion que ya no alcanza al jugador y cae en la ultima asignada', () => {
+    // El coach le quito el assignment de 'vieja': la FK no se entera, la regla si.
+    const newer = at('2026-02-01', { programId: 'nueva' })
+    expect(resolveProgram([newer], 'vieja')?.programId).toBe('nueva')
   })
 
-  it('ante empate gana el createdAt más reciente', () => {
-    expect(
-      resolveProgram([
-        candidate({ assignmentId: 'v', programId: 'viejo', createdAt: at('2026-01-01T00:00:00Z') }),
-        candidate({ assignmentId: 'n', programId: 'nuevo', createdAt: at('2026-06-01T00:00:00Z') }),
-      ])?.programId,
-    ).toBe('nuevo')
+  it('una eleccion null significa "la ultima asignada", no "ninguna"', () => {
+    const newer = at('2026-02-01', { programId: 'nueva' })
+    expect(resolveProgram([newer], null)?.programId).toBe('nueva')
   })
 
-  it('el empate desempata por fecha aun entre kinds distintos con el mismo score', () => {
-    expect(
-      resolveProgram([
-        candidate({
-          assignmentId: 'a',
-          kind: 'SYSTEM_GROUP', // 30 + 20 = 50
-          priority: 20,
-          programId: 'system-boosteado',
-          createdAt: at('2026-03-01T00:00:00Z'),
-        }),
-        candidate({
-          assignmentId: 'b',
-          kind: 'POSITION_GROUP', // 50 + 0 = 50
-          priority: 0,
-          programId: 'custom',
-          createdAt: at('2026-01-01T00:00:00Z'),
-        }),
-      ])?.programId,
-    ).toBe('system-boosteado')
+  it('si dos assignments apuntan al mismo programa elegido, devuelve el mas reciente', () => {
+    const a = at('2026-01-01', { programId: 'x', assignmentId: 'viejo' })
+    const b = at('2026-03-01', { programId: 'x', assignmentId: 'nuevo' })
+    expect(resolveProgram([a, b], 'x')?.assignmentId).toBe('nuevo')
   })
 
   it('no muta el array de entrada', () => {
     const list = [
-      candidate({ assignmentId: '1', kind: 'POSITION' }),
-      candidate({ assignmentId: '2', kind: 'PLAYER' }),
+      at('2026-01-01', { assignmentId: '1' }),
+      at('2026-02-01', { assignmentId: '2' }),
     ]
     resolveProgram(list)
     expect(list.map((c) => c.assignmentId)).toEqual(['1', '2'])

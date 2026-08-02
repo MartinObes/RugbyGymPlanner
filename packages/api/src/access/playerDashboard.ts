@@ -22,7 +22,7 @@ export type PlayerDashboard = {
  */
 export async function playerDashboardFor(
   db: SupabaseClient<Database>,
-  player: { id: string; positionId: string | null },
+  player: { id: string; positionId: string | null; selectedProgramId?: string | null },
 ): Promise<PlayerDashboard> {
   const trends = trendsFrom(await evaluationsFor(db, player.id))
   const empty: PlayerDashboard = {

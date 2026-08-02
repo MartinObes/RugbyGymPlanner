@@ -58,7 +58,7 @@ export const withActor = createMiddleware<{ Variables: AuthVariables }>(async (c
   // con el JWT del usuario: RLS garantiza que solo puede leer su propia fila.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, name, role, invite_code, coach_id, position_id')
+    .select('id, email, name, role, invite_code, coach_id, position_id, selected_program_id')
     .eq('id', user.id)
     .single()
 
@@ -73,6 +73,10 @@ export const withActor = createMiddleware<{ Variables: AuthVariables }>(async (c
       // Lo necesita la resolución del programa del jugador: los assignments
       // scopean por puesto y por grupo, no solo por jugador.
       positionId: profile.position_id,
+      // La elección de rutina (F4-B §2.3). Se resuelve al leer: si el programa
+      // elegido ya no lo alcanza, resolveProgram lo ignora y cae en la última
+      // asignada.
+      selectedProgramId: profile.selected_program_id,
     })
   }
 

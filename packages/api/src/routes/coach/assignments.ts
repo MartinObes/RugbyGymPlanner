@@ -1,8 +1,13 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { positionById, SYSTEM_GROUPS } from '@coachlab/core/domain/positions'
-import { BASE_PRIORITY } from '@coachlab/core/domain/resolveProgram'
+import { SYSTEM_GROUPS } from '@coachlab/core/domain/positions'
+import { resolveProgram } from '@coachlab/core/domain/resolveProgram'
 import { assignmentSchema } from '@coachlab/core/validators/program'
-import { ASSIGNMENT_COLUMNS, activeProgramIdFor, kindOf, type AssignmentRow } from '../../access/assignments'
+import {
+  ASSIGNMENT_COLUMNS,
+  candidateAssignmentsFor,
+  kindOf,
+  type AssignmentRow,
+} from '../../access/assignments'
 import type { AuthVariables } from '../../middleware/auth'
 import { ErrorResponse } from '../schemas'
 import { assertRow } from './_scope'
@@ -14,12 +19,9 @@ const ProgramIdParam = z.object({
 const Assignment = z
   .object({
     id: z.string().uuid(),
-    kind: z.enum(['PLAYER', 'POSITION_GROUP', 'SYSTEM_GROUP', 'POSITION']),
+    kind: z.enum(['PLAYER', 'POSITION_GROUP', 'SYSTEM_GROUP']),
     /** Nombre del destino resuelto, para no hacer que el frontend lo busque. */
     targetName: z.string(),
-    basePriority: z.number(),
-    priority: z.number(),
-    totalPriority: z.number(),
     createdAt: z.string(),
   })
   .openapi('Assignment')
@@ -33,8 +35,12 @@ const PreviewRow = z
     playerId: z.string().uuid(),
     name: z.string(),
     positionId: z.string().nullable(),
+    /** El que el jugador está VIENDO: su elección, o la última asignada. */
     programId: z.string().uuid().nullable(),
     programName: z.string().nullable(),
+    /** El que le tocaría por asignación, ignorando su elección. */
+    assignedProgramId: z.string().uuid().nullable(),
+    assignedProgramName: z.string().nullable(),
   })
   .openapi('AssignmentPreviewRow')
 
@@ -108,19 +114,12 @@ assignments.openapi(
           ? (nameOf((row as Record<string, unknown>).profiles) ?? 'Jugador')
           : kind === 'POSITION_GROUP'
             ? (nameOf((row as Record<string, unknown>).position_groups) ?? 'Grupo')
-            : kind === 'SYSTEM_GROUP'
-              ? (SYSTEM_GROUPS.find((g) => g.id === assignment.system_group_id)?.name ?? 'Grupo')
-              : (positionById(assignment.position_id ?? '')?.name ?? 'Puesto')
-
-      const basePriority = BASE_PRIORITY[kind]
+            : (SYSTEM_GROUPS.find((g) => g.id === assignment.system_group_id)?.name ?? 'Grupo')
 
       return {
         id: assignment.id,
         kind,
         targetName,
-        basePriority,
-        priority: assignment.priority,
-        totalPriority: basePriority + assignment.priority,
         createdAt: assignment.created_at,
       }
     })
@@ -184,12 +183,10 @@ assignments.openapi(
       .insert({
         program_id: programId,
         // Exactamente uno no-nulo: lo garantiza assignmentSchema y el CHECK
-        // program_assignments_one_target (0001).
+        // program_assignments_one_target (0019).
         player_id: input.playerId ?? null,
         position_group_id: input.positionGroupId ?? null,
         system_group_id: input.systemGroupId ?? null,
-        position_id: input.positionId ?? null,
-        priority: input.priority,
       })
       .select('id')
       .maybeSingle()
@@ -253,7 +250,7 @@ assignments.openapi(
 
     const { data: playersData, error } = await db
       .from('profiles')
-      .select('id, name, position_id')
+      .select('id, name, position_id, selected_program_id')
       .eq('coach_id', actor.id)
       .eq('role', 'PLAYER')
       .order('name')
@@ -277,7 +274,14 @@ assignments.openapi(
       (playersData ?? []).map(async (p) => {
         const playerId = p.id as string
         const positionId = (p.position_id as string | null) ?? null
-        const programId = await activeProgramIdFor(db, { id: playerId, positionId })
+        const selectedProgramId = (p.selected_program_id as string | null) ?? null
+
+        // Las candidatas se traen UNA vez y se resuelven dos: con la elección
+        // del jugador y sin ella. Llamar a activeProgramIdFor y a
+        // assignedProgramIdFor por separado duplicaría las queries por jugador.
+        const candidates = await candidateAssignmentsFor(db, { id: playerId, positionId })
+        const programId = resolveProgram(candidates, selectedProgramId)?.programId ?? null
+        const assignedProgramId = resolveProgram(candidates)?.programId ?? null
 
         return {
           playerId,
@@ -285,6 +289,10 @@ assignments.openapi(
           positionId,
           programId,
           programName: programId ? (programNames.get(programId) ?? null) : null,
+          assignedProgramId,
+          assignedProgramName: assignedProgramId
+            ? (programNames.get(assignedProgramId) ?? null)
+            : null,
         }
       }),
     )

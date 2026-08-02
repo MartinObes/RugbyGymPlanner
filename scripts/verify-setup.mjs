@@ -327,13 +327,91 @@ try {
     repointErr?.message?.slice(0, 45) ?? 'PUDO — el UPDATE evade el trigger',
   )
 
-  // 0009: editar SOLO la prioridad de un assignment no dispara la validación de
-  // destinos. Antes quedaba inmodificable si el destino se había vuelto inválido.
-  const { error: priorityErr } = await admin
+  // 0009: editar una columna que NO está en la lista del trigger no dispara la
+  // validación de destinos. Antes el assignment quedaba inmodificable si el
+  // destino se había vuelto inválido.
+  //
+  // La columna era `priority`, que F4-B borró en 0019. Ahora la que importa es
+  // created_at, que es justamente la que decide quién gana.
+  const { error: touchErr } = await admin
+    .from('program_assignments')
+    .update({ created_at: new Date().toISOString() })
+    .eq('id', ownAssignment.id)
+  check('se puede editar created_at sin revalidar destinos', !touchErr, touchErr?.message ?? '')
+
+  // --- 0019 (F4-B): las columnas viejas se fueron de verdad ----------------
+  const { error: goneErr } = await admin
     .from('program_assignments')
     .update({ priority: 5 })
     .eq('id', ownAssignment.id)
-  check('se puede editar la prioridad sin revalidar destinos', !priorityErr, priorityErr?.message ?? '')
+  check(
+    '0019: priority ya no existe como columna',
+    !!goneErr,
+    goneErr?.message?.slice(0, 50) ?? 'PUDO — la migración 0019 no se aplicó',
+  )
+
+  const { error: positionTargetErr } = await admin
+    .from('program_assignments')
+    .insert({ program_id: ownProgram.id, position_id: 'wing' })
+  check(
+    '0019: el puesto ya no es un destino de assignment',
+    !!positionTargetErr,
+    positionTargetErr?.message?.slice(0, 50) ?? 'PUDO — position_id sigue ahí',
+  )
+
+  // --- 0019 (F4-B §2.3): la elección del jugador y su reset ----------------
+  //
+  // Es la regla que hace que C1 no sea "el jugador elige su rutina": la
+  // prescripción del coach siempre gana. Si el reset no corre, un lesionado se
+  // queda mirando la rutina vieja y nadie se entera.
+  await admin.from('profiles').update({ selected_program_id: ownProgram.id }).eq('id', playerId)
+
+  const { data: beforeReset } = await admin
+    .from('profiles')
+    .select('selected_program_id')
+    .eq('id', playerId)
+    .single()
+  check(
+    '0019: el jugador puede elegir una rutina',
+    beforeReset?.selected_program_id === ownProgram.id,
+    `quedó ${beforeReset?.selected_program_id}`,
+  )
+
+  // Un assignment nuevo al grupo system que lo contiene ('backs', porque su
+  // position_id es 'wing') tiene que resetear su elección.
+  const { data: freshProgram } = await admin
+    .from('programs')
+    .insert({ coach_id: coachId, name: 'Programa nuevo' })
+    .select('id')
+    .single()
+  createdPrograms.push(freshProgram.id)
+  await admin
+    .from('program_assignments')
+    .insert({ program_id: freshProgram.id, system_group_id: 'backs' })
+
+  const { data: afterReset } = await admin
+    .from('profiles')
+    .select('selected_program_id')
+    .eq('id', playerId)
+    .single()
+  check(
+    '0019: asignar algo nuevo resetea la elección del jugador',
+    afterReset?.selected_program_id === null,
+    `quedó ${afterReset?.selected_program_id} — el trigger reset_selected_program no corrió`,
+  )
+
+  // La elección es del jugador: el guard de perfil no la frena (es deny-list y
+  // esta columna no está en la lista).
+  const { error: ownChoiceErr } = await asPlayer
+    .from('profiles')
+    .update({ selected_program_id: ownProgram.id })
+    .eq('id', playerId)
+  check(
+    '0019: el jugador puede escribir su propia elección',
+    !ownChoiceErr,
+    ownChoiceErr?.message?.slice(0, 50) ?? '',
+  )
+  await admin.from('profiles').update({ selected_program_id: null }).eq('id', playerId)
 
   // 0009: el trigger también corta desde una sesión de COACH real, no solo con
   // service_role (que es el camino de las migraciones, no el de producción).

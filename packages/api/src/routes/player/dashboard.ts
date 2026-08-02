@@ -49,10 +49,7 @@ playerDashboard.openapi(
   }),
   async (c) => {
     const actor = c.get('actor')!
-    const dashboard = await playerDashboardFor(c.get('db'), {
-      id: actor.id,
-      positionId: actor.positionId,
-    })
+    const dashboard = await playerDashboardFor(c.get('db'), actor)
     return c.json({ ok: true as const, ...dashboard }, 200)
   },
 )
