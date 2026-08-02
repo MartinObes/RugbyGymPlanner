@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { POSITIONS, SYSTEM_GROUPS, positionById } from '@coachlab/core/domain/positions'
-import { BASE_PRIORITY } from '@coachlab/core/domain/resolveProgram'
+import { SYSTEM_GROUPS, positionById } from '@coachlab/core/domain/positions'
 import type {
   AssignmentPreviewResponse,
   AssignmentsResponse,
@@ -55,19 +54,19 @@ const { data: groups } = groupsAsync
 
 // --- form de alta ------------------------------------------------------------
 
-type Mode = 'PLAYER' | 'POSITION' | 'SYSTEM_GROUP' | 'POSITION_GROUP'
+// Tres destinos desde F4-B §2.2: el puesto salió, porque un grupo propio de una
+// sola posición hace lo mismo y ya existía.
+type Mode = 'PLAYER' | 'SYSTEM_GROUP' | 'POSITION_GROUP'
 
 const MODE_ITEMS = [
   { label: 'Un jugador', value: 'PLAYER' },
-  { label: 'Un puesto', value: 'POSITION' },
   { label: 'Forwards / Backs', value: 'SYSTEM_GROUP' },
   { label: 'Un grupo propio', value: 'POSITION_GROUP' },
 ]
 
-const mode = ref<Mode>('POSITION')
+const mode = ref<Mode>('SYSTEM_GROUP')
 // undefined y no null: es lo que USelect entiende como "sin elegir".
 const target = ref<string | undefined>(undefined)
-const priority = ref(0)
 const saving = ref(false)
 
 watch(mode, () => {
@@ -78,9 +77,6 @@ const targetItems = computed(() => {
   if (mode.value === 'PLAYER') {
     return (roster.value?.players ?? []).map((p) => ({ label: p.name, value: p.id }))
   }
-  if (mode.value === 'POSITION') {
-    return POSITIONS.map((p) => ({ label: p.name, value: p.id as string }))
-  }
   if (mode.value === 'SYSTEM_GROUP') {
     return SYSTEM_GROUPS.map((g) => ({ label: g.name, value: g.id as string }))
   }
@@ -89,21 +85,17 @@ const targetItems = computed(() => {
     .map((g) => ({ label: g.name, value: g.id }))
 })
 
-const basePriorityForMode = computed(() => BASE_PRIORITY[mode.value])
-
 async function create() {
   if (!target.value) return
   saving.value = true
-  const body: Record<string, unknown> = { priority: priority.value }
+  const body: Record<string, unknown> = {}
   if (mode.value === 'PLAYER') body.playerId = target.value
-  if (mode.value === 'POSITION') body.positionId = target.value
   if (mode.value === 'SYSTEM_GROUP') body.systemGroupId = target.value
   if (mode.value === 'POSITION_GROUP') body.positionGroupId = target.value
 
   try {
     await api.post(`/api/coach/programs/${programId}/assignments`, body)
     target.value = undefined
-    priority.value = 0
     await Promise.all([refreshAssignments(), refreshPreview()])
   } catch (e) {
     toast.add({
@@ -149,7 +141,6 @@ const KIND_LABEL: Record<string, string> = {
   PLAYER: 'Jugador',
   POSITION_GROUP: 'Grupo propio',
   SYSTEM_GROUP: 'Del sistema',
-  POSITION: 'Puesto',
 }
 
 const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id) : 'Sin puesto')
@@ -180,18 +171,12 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
           />
         </UFormField>
 
-        <UFormField label="Prioridad extra" :hint="`base ${basePriorityForMode}`">
-          <UInput v-model.number="priority" type="number" min="-100" max="500" class="w-24" />
-        </UFormField>
-
         <UButton :disabled="!target" :loading="saving" @click="create">Asignar</UButton>
       </div>
 
       <p class="mt-3 text-sm text-muted">
-        Cuando a un jugador le llegan varios programas gana el de mayor prioridad. Las bases son:
-        jugador {{ BASE_PRIORITY.PLAYER }}, grupo propio {{ BASE_PRIORITY.POSITION_GROUP }},
-        Forwards/Backs {{ BASE_PRIORITY.SYSTEM_GROUP }}, puesto {{ BASE_PRIORITY.POSITION }}. La
-        prioridad extra se suma a la base.
+        Cuando a un jugador le llegan varios programas, gana <strong>el último que asignaste</strong>.
+        ¿Querés asignar por puesto? Creá un grupo propio con ese puesto solo.
       </p>
     </UCard>
 
@@ -214,12 +199,10 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
                no un estado. -->
           <UBadge color="navy" variant="subtle">{{ KIND_LABEL[assignment.kind] }}</UBadge>
           <span class="min-w-0 flex-1 truncate font-medium">{{ assignment.targetName }}</span>
-          <span class="font-mono text-sm text-muted">
-            {{ assignment.basePriority }}
-            <template v-if="assignment.priority !== 0">
-              {{ assignment.priority > 0 ? '+' : '−' }} {{ Math.abs(assignment.priority) }}
-            </template>
-            = {{ assignment.totalPriority }}
+          <!-- La lista viene ordenada por created_at desc, así que la de arriba
+               es la que gana. La fecha es lo único que decide desde F4-B. -->
+          <span class="hidden text-sm text-muted sm:block">
+            {{ new Date(assignment.createdAt).toLocaleDateString('es-UY') }}
           </span>
           <UButton
             icon="i-lucide-x"
@@ -237,13 +220,13 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
       </ul>
     </UCard>
 
-    <!-- Lo que evita descubrir un conflicto de prioridades cuando un jugador se queja -->
+    <!-- Lo que evita descubrir que un jugador está viendo otra cosa cuando se queja -->
     <UCard>
       <template #header>
         <div>
-          <h2 class="font-semibold">Qué le queda a cada jugador</h2>
+          <h2 class="font-semibold">Qué está viendo cada jugador</h2>
           <p class="mt-1 text-sm text-muted">
-            Resultado de resolver todas las prioridades de todos tus programas.
+            La última rutina que le asignaste, salvo que el jugador haya elegido volver a otra.
           </p>
         </div>
       </template>
@@ -253,9 +236,24 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
       </p>
 
       <ul v-else class="divide-y divide-default">
-        <li v-for="row in preview.rows" :key="row.playerId" class="flex items-center gap-3 py-2">
+        <li v-for="row in preview.rows" :key="row.playerId" class="flex flex-wrap items-center gap-2 py-2">
           <span class="min-w-0 flex-1 truncate">{{ row.name }}</span>
           <span class="hidden text-sm text-muted sm:block">{{ positionName(row.positionId) }}</span>
+
+          <!--
+            Sin esta marca la pantalla le mentiría al coach: creería que todos ven
+            lo último que asignó. Con ella, la elección del jugador es auditable
+            (F4-B §2.4).
+          -->
+          <UBadge
+            v-if="row.assignedProgramId && row.programId !== row.assignedProgramId"
+            color="warning"
+            variant="subtle"
+            :title="`Le asignaste ${row.assignedProgramName ?? 'otra rutina'}`"
+          >
+            Eligió otra
+          </UBadge>
+
           <UBadge
             v-if="row.programId"
             :color="row.programId === programId ? 'primary' : 'neutral'"
@@ -274,8 +272,8 @@ const positionName = (id: string | null) => (id ? (positionById(id)?.name ?? id)
     >
       <template #body>
         <p class="text-sm text-muted">
-          Este programa deja de alcanzar a ese destino. Si tenía otro programa con menor prioridad
-          asignado, pasa a recibir ese en su lugar.
+          Este programa deja de alcanzar a ese destino. Si tenía otro programa asignado antes, pasa
+          a recibir ese en su lugar.
         </p>
       </template>
       <template #footer>

@@ -1,14 +1,55 @@
 <script setup lang="ts">
-import type { PlayerWeekResponse } from '~~/generated'
+import type { PlayerProgramsResponse, PlayerWeekResponse } from '~~/generated'
 
 const { user } = useAuth()
 const api = usePlayerApi()
+const toast = useToast()
 
-const { data, error, refresh } = await useAsyncData('player-week', () =>
+const weekAsync = useAsyncData('player-week', () =>
   api.get<PlayerWeekResponse>('/api/player/week'),
 )
+const programsAsync = useAsyncData('player-programs', () =>
+  api.get<PlayerProgramsResponse>('/api/player/programs'),
+)
+
+// Las dos cargas salen juntas: un `await` en el setup frena el siguiente, y cada
+// request autenticada paga antes el preámbulo de withActor
+// (docs/PERFORMANCE-F4.md).
+await Promise.all([weekAsync, programsAsync])
+
+const { data, error, refresh } = weekAsync
+const { data: programsData, refresh: refreshPrograms } = programsAsync
 
 const week = computed(() => data.value?.week ?? null)
+
+// El selector sólo aparece con más de una rutina: con una sola, un selector de
+// un elemento es ruido (F4-B §2.3).
+const programs = computed(() => programsData.value?.programs ?? [])
+const selected = ref<string | undefined>(undefined)
+
+watchEffect(() => {
+  selected.value = programs.value.find((p) => p.current)?.programId
+})
+
+const switching = ref(false)
+
+async function onSelect(programId: string) {
+  switching.value = true
+  try {
+    await api.put('/api/player/programs/selected', { programId })
+    await Promise.all([refresh(), refreshPrograms()])
+  } catch (e) {
+    toast.add({
+      title: 'No se pudo cambiar la rutina',
+      description: e instanceof Error ? e.message : undefined,
+      color: 'error',
+    })
+    // Volver al que estaba: si no, el selector muestra algo que no se guardó.
+    selected.value = programs.value.find((p) => p.current)?.programId
+  } finally {
+    switching.value = false
+  }
+}
 
 /** Los 1RM que faltan en toda la semana, no solo en un día. */
 const missingOneRms = computed(() => [
@@ -42,6 +83,25 @@ function stateOf(day: Day) {
       <UBadge v-if="week" color="navy" variant="subtle" class="mt-1">
         {{ week.weekName }}
       </UBadge>
+    </div>
+
+    <!--
+      Volver a otra rutina asignada. La elección dura hasta que el entrenador
+      asigne algo nuevo, y ahí se resetea sola: la prescripción del coach siempre
+      gana (F4-B §2.3).
+    -->
+    <div v-if="programs.length > 1" class="space-y-1">
+      <USelect
+        v-model="selected"
+        :items="programs.map((p) => ({ label: p.name, value: p.programId }))"
+        :loading="switching"
+        class="w-full"
+        aria-label="Elegí qué rutina querés ver"
+        @update:model-value="onSelect"
+      />
+      <p class="text-xs text-muted">
+        Tu entrenador puede cambiarte la rutina en cualquier momento.
+      </p>
     </div>
 
     <!-- Jugador sin coach: el trigger no vincula si el código no matcheó. -->
