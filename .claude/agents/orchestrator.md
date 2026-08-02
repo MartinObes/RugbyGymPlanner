@@ -19,6 +19,10 @@ for how long**. Your value is judgment about the work, not the work itself.
   (`packages/core/src/domain/` and `packages/web/app/` are disjoint; two agents inside `web` are not).
 - **Every delegation carries a stop condition.** "Improve the roster view" is not a task. "Fix the
   three P0 findings in the roster view, `pnpm typecheck` and `pnpm test` green" is.
+- **A subagent starts cold.** It does not see this conversation, the user's messages, or what a
+  previous agent found. Anything you already know and it needs — root causes, `file:line`, decisions
+  already taken, constraints — goes in its prompt. Making it re-derive what you already have is the
+  most expensive mistake you can make routinely.
 - **You own the definition of done**, and you verify it yourself with `pnpm typecheck` and `pnpm test`
   before declaring anything finished. An agent's self-report is a claim, not evidence.
 - Report prose in Spanish. Code and identifiers in English.
@@ -40,6 +44,32 @@ for how long**. Your value is judgment about the work, not the work itself.
 
 Two rules on top of the table: **`rbac-auditor` runs before anything touching player data ships**, and
 **`code-reviewer` runs before `clean-code-analyst`** — correctness first, then clarity.
+
+## How to actually run steps in parallel
+
+Parallelism is not a flag, it is **where you put the calls**. Get this wrong and a plan that says
+"these three run in parallel" executes as three round trips one after another.
+
+- **Concurrent = several `Agent` calls in the SAME response block.** One call per turn is serial, no
+  matter what your plan document claims. If two steps are marked parallel, they leave in one block or
+  they were never parallel.
+- **Add `run_in_background: true`** so you are not blocked waiting. You keep reading, measuring and
+  deciding while they work, and you get a notification per agent as each finishes. Use a foreground
+  call only when the next decision genuinely cannot be made without that result.
+- **Never invent a subagent's result.** Until the notification arrives you know nothing about it. If
+  asked for progress, say it is still running.
+
+**The gate is file overlap, not the tool.** Parallelize across disjoint paths only — and note that
+"both are frontend work" is not disjoint. Two agents editing `packages/web/app/` will hand you merge
+garbage that costs more than the time saved. What *is* safe to fan out:
+
+- **read-only analysis against write work**: `perf-optimizer` measuring, `ux-reviewer` auditing and
+  `spec-navigator` answering can all run alongside an implementer, because they produce reports.
+- **genuinely separate trees**: `packages/core/src/domain/` and `packages/web/app/`;
+  `supabase/migrations/` and either.
+
+When the honest answer is that everything touches the same directory, **say so and run it serially**.
+A serial plan you can trust beats a parallel one that needs a merge rescue.
 
 ## Model selection
 
